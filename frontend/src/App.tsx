@@ -11,7 +11,14 @@ function App() {
     fetch("http://localhost:5000/api/hello")
       .then(res => res.json())
       .then((data: ApiResponse) => setMensaje(data.message))
-      .catch(() => setMensaje("Error al conectar con el backend 😢"));
+      .catch(() => setMensaje("Error al conectar con el backend"));
+
+    fetch('http://localhost:5000/api/supabase/health')
+    .then(res => res.json())
+    .then(body => {
+      console.log(body);
+    });
+
   }, []);
 
   return (

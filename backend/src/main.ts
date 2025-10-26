@@ -1,15 +1,19 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { ENV } from "./config/env";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: "http://localhost:5173", // o 3000, depende de tu frontend
+    origin: ENV.FRONTEND_ORIGIN,
     credentials: true,
   });
 
-  await app.listen(5000);
-  console.log("🚀 Backend corriendo en http://localhost:5000");
+  app.setGlobalPrefix("api");
+
+  await app.listen(parseInt(ENV.PORT, 10));
+
+  console.log(`Backend corriendo en http://localhost:${ENV.PORT}`);
 }
 void bootstrap();
