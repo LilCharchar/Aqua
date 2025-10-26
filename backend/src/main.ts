@@ -15,5 +15,6 @@ async function bootstrap() {
   await app.listen(parseInt(ENV.PORT, 10));
 
   console.log(`Backend corriendo en http://localhost:${ENV.PORT}`);
+  console.log(`Frontend corrriendo en ${ENV.FRONTEND_ORIGIN}`);
 }
 void bootstrap();
