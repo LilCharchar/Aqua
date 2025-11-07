@@ -2,7 +2,7 @@ import { useState } from "react";
 
 function Login() {
   const [correo, setCorreo] = useState("");
-  const [contrasena, setContrasena] = useState("");
+  const [contraseña, setContrasena] = useState("");
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
 
@@ -12,14 +12,14 @@ function Login() {
     setResultado(null);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           correo: correo,
-          contraseña: contrasena,
+          contraseña: contraseña,
         }),
       });
 
@@ -37,8 +37,8 @@ function Login() {
         // login inválido
         setResultado(`Error: ${data.message ?? "Credenciales inválidas"}`);
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
+      console.log(err);
       setResultado("Error de red o servidor caído");
     } finally {
       setLoading(false);
@@ -77,7 +77,7 @@ function Login() {
           <input
             id="contrasena"
             type="password"
-            value={contrasena}
+            value={contraseña}
             onChange={(e) => setContrasena(e.target.value)}
             placeholder="••••••"
             required
