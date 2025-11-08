@@ -63,11 +63,13 @@ function Login() {
   if (user?.rol === 3) return <MeseroHome user={user} logout={logout} />;
 
   return (
+    
     <div className="h-screen w-full relative overflow-hidden bg-[var(--background)] flex flex-col items-center justify-center">
       <div className=" inset-0 flex items-center justify-center h-full z-10 relative">
-        <div className="shadow-2xl rounded-[61px] bg-[var(--secondary)] relative p-8 pt-[50px] pb-[50px] w-[539] h-[392] z-20">
-              <form onSubmit={handleSubmit} className="flex flex-col items-center justify-center gap-5 ">
+        <div className="shadow-2xl rounded-[61px] bg-[var(--secondary)] relative p-8 pt-[50px] pb-[50px] w-[539] h-[392]">
+              <form className="flex flex-col items-center justify-center gap-5 " onSubmit={handleSubmit}>
                   <Input
+                    id="correo"
                     type="email"
                     value={correo}
                     onChange={(e) => setCorreo(e.target.value)}
@@ -75,6 +77,7 @@ function Login() {
                     required
                   />
                   <Input
+                    id="contraseña"
                     type="password"
                     value={contraseña}
                     onChange={(e) => setContrasena(e.target.value)}
@@ -92,8 +95,9 @@ function Login() {
           </div>
           )}
         </div>
+        
       </div>
-      <WaveBackground />
+      <WaveBackground/>
     </div>
   );
 }

@@ -15,8 +15,8 @@ const WaveBackground: React.FC<WaveBackgroundProps> = ({
 }) => {
     return (
         <div
-            className={`fixed ${position}-0 left-0 w-full overflow-hidden leading-none pointer-events-none z-[-1] ${className}`}
-            style={{ bottom: '-1px'}}
+            className={`absolute ${position}-0 left-0 w-full overflow-hidden leading-none pointer-events-none z-0${className}`}
+            style={{ bottom: '-1px' }}
         >
             <svg
                 viewBox="0 0 1440 462"
