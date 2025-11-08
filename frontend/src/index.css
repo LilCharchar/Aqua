@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+.light{
+    --background: #FAF7F0;
+    --primary: #3E92CC;
+    --secondary: #E6EBEF;
+    --options: #FFFFFF;
+    --text-primary: #5D737E;
+    --text-secondary: #8E8787;
+}
