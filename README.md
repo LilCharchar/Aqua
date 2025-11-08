@@ -77,3 +77,24 @@ curl -X POST http://localhost:5000/api/auth/register \
 ```
 
 Cada comando devuelve un objeto JSON con la propiedad `ok`. Si `ok` es `false`, revisa el campo `message` para conocer el error devuelto por la API.
+
+## 8. Notas de seguridad
+
+- Las contraseñas se almacenan con `bcrypt` (coste 10) al registrarse.
+- Si tenías usuarios creados antes de este cambio (contraseña en texto plano), vuelve a registrarlos o actualiza su contraseña para que se guarde hasheada.
+
+## 9. Ejecutar tests
+
+Los tests del backend se ejecutan desde la carpeta `backend/` usando Jest:
+
+```bash
+cd backend
+npm test
+```
+
+Para correr una suite específica (por ejemplo la de `AuthService`):
+
+```bash
+cd backend
+npm test -- --runTestsByPath src/auth.service.spec.ts
+```

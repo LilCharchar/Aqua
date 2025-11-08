@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import * as bcrypt from "bcrypt";
 import { SupabaseService } from "../../src/supabase.service";
 import { CreateUserDto, LoginDto } from "./auth.dto";
 
@@ -14,6 +15,10 @@ interface UsuarioPOS {
 @Injectable()
 export class AuthService {
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  private isHashedPassword(password: string | null): boolean {
+    return Boolean(password?.startsWith("$2"));
+  }
 
   async login(dto: LoginDto) {
     const supabase = this.supabaseService.getClient();
@@ -37,7 +42,13 @@ export class AuthService {
 
     const user = data[0] as unknown as UsuarioPOS;
 
-    if (user.contraseña !== dto.contraseña) {
+    const storedPassword = user.contraseña ?? "";
+    const shouldUseHash = this.isHashedPassword(storedPassword);
+    const isValid = shouldUseHash
+      ? await bcrypt.compare(dto.contraseña, storedPassword)
+      : storedPassword === dto.contraseña;
+
+    if (!isValid) {
       return { ok: false, message: "Credenciales inválidas" };
     }
 
@@ -63,6 +74,7 @@ export class AuthService {
     if (existing) return { ok: false, message: "Correo ya registrado" };
 
     const activo = dto.activo ?? true;
+    const hashedPassword = await bcrypt.hash(dto.contraseña, 10);
 
     const { data, error: insErr } = await supabase
       .from("usuarios")
@@ -70,7 +82,7 @@ export class AuthService {
         {
           nombre: dto.nombre,
           correo: dto.correo,
-          contraseña: dto.contraseña,
+          contraseña: hashedPassword,
           rol_id: dto.rol_id ?? null,
           activo,
         },
