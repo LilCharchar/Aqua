@@ -18,6 +18,20 @@ function createLoginBuilder(response: {
   return { select };
 }
 
+function createUpdateBuilder(response: { data: unknown; error: Error | null }) {
+  const single = jest.fn().mockResolvedValue(response);
+  const select = jest.fn().mockReturnValue({ single });
+  const eq = jest.fn().mockReturnValue({ select });
+  const payloads: Record<string, unknown>[] = [];
+  const update = jest
+    .fn()
+    .mockImplementation((payload: Record<string, unknown>) => {
+      payloads.push(payload);
+      return { eq };
+    });
+  return { update, payloads };
+}
+
 describe("AuthService", () => {
   let authService: AuthService;
   let supabaseService: { getClient: jest.Mock };
@@ -186,6 +200,112 @@ describe("AuthService", () => {
       expect(result).toEqual({
         ok: false,
         message: "Correo ya registrado",
+      });
+    });
+  });
+
+  describe("updateUser", () => {
+    it("actualiza datos y rehashea la contraseña cuando se provee", async () => {
+      const builder = createUpdateBuilder({
+        data: {
+          id: "1",
+          nombre: "Actualizado",
+          correo: "user@test.dev",
+          rol_id: 2,
+          activo: true,
+        },
+        error: null,
+      });
+
+      fromMock.mockReturnValueOnce(builder);
+
+      const result = await authService.updateUser("1", {
+        nombre: "Actualizado",
+        contraseña: "nueva",
+        rol_id: 2,
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        userId: "1",
+        nombre: "Actualizado",
+        correo: "user@test.dev",
+        rol: 2,
+        activo: true,
+      });
+
+      expect(builder.update).toHaveBeenCalledTimes(1);
+      const payload = builder.payloads[0] as {
+        contraseña: string;
+        nombre: string;
+        rol_id: number;
+      };
+      expect(payload.nombre).toBe("Actualizado");
+      expect(payload.rol_id).toBe(2);
+      expect(payload.contraseña).toBeDefined();
+      expect(payload.contraseña).not.toBe("nueva");
+      expect(payload.contraseña.startsWith("$2")).toBe(true);
+    });
+
+    it("devuelve error si no hay campos que actualizar", async () => {
+      const result = await authService.updateUser("1", {});
+      expect(result).toEqual({
+        ok: false,
+        message: "No hay cambios para aplicar",
+      });
+    });
+  });
+
+  describe("cambios de estado", () => {
+    it("desactiva un usuario", async () => {
+      const builder = createUpdateBuilder({
+        data: {
+          id: "1",
+          nombre: "Test",
+          correo: "user@test.dev",
+          rol_id: 1,
+          activo: false,
+        },
+        error: null,
+      });
+
+      fromMock.mockReturnValueOnce(builder);
+      const result = await authService.deactivateUser("1");
+
+      expect(builder.payloads[0]).toEqual({ activo: false });
+      expect(result).toEqual({
+        ok: true,
+        userId: "1",
+        nombre: "Test",
+        correo: "user@test.dev",
+        rol: 1,
+        activo: false,
+      });
+    });
+
+    it("restaura un usuario desactivado", async () => {
+      const builder = createUpdateBuilder({
+        data: {
+          id: "1",
+          nombre: "Test",
+          correo: "user@test.dev",
+          rol_id: 1,
+          activo: true,
+        },
+        error: null,
+      });
+
+      fromMock.mockReturnValueOnce(builder);
+      const result = await authService.restoreUser("1");
+
+      expect(builder.payloads[0]).toEqual({ activo: true });
+      expect(result).toEqual({
+        ok: true,
+        userId: "1",
+        nombre: "Test",
+        correo: "user@test.dev",
+        rol: 1,
+        activo: true,
       });
     });
   });

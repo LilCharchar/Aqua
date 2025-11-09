@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { SupabaseService } from "../../src/supabase.service";
-import { CreateUserDto, LoginDto } from "./auth.dto";
+import { CreateUserDto, LoginDto, UpdateUserDto } from "./auth.dto";
 
 interface UsuarioPOS {
   id: string;
@@ -18,6 +18,16 @@ export class AuthService {
 
   private isHashedPassword(password: string | null): boolean {
     return Boolean(password?.startsWith("$2"));
+  }
+
+  private buildUserResponse(user: UsuarioPOS) {
+    return {
+      userId: user.id,
+      nombre: user.nombre,
+      correo: user.correo,
+      rol: user.rol_id,
+      activo: user.activo,
+    };
   }
 
   async login(dto: LoginDto) {
@@ -95,13 +105,62 @@ export class AuthService {
     if (insErr || !user)
       return { ok: false, message: "No se pudo crear el usuario" };
 
-    return {
-      ok: true,
-      userId: user.id,
-      nombre: user.nombre,
-      correo: user.correo,
-      rol: user.rol_id,
-      activo: user.activo,
-    };
+    return { ok: true, ...this.buildUserResponse(user) };
+  }
+
+  async updateUser(id: string, dto: UpdateUserDto) {
+    const supabase = this.supabaseService.getClient();
+
+    const payload: Partial<UsuarioPOS> = {};
+    if (dto.nombre !== undefined) payload.nombre = dto.nombre;
+    if (dto.correo !== undefined) payload.correo = dto.correo;
+    if (dto.rol_id !== undefined) payload.rol_id = dto.rol_id ?? null;
+    if (dto.activo !== undefined) payload.activo = dto.activo;
+    if (dto.contraseña) {
+      payload.contraseña = await bcrypt.hash(dto.contraseña, 10);
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return { ok: false, message: "No hay cambios para aplicar" };
+    }
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .update(payload)
+      .eq("id", id)
+      .select("id, nombre, correo, rol_id, activo")
+      .single();
+
+    if (error || !data)
+      return { ok: false, message: "No se pudo actualizar el usuario" };
+
+    const user = data as unknown as UsuarioPOS;
+
+    return { ok: true, ...this.buildUserResponse(user) };
+  }
+
+  private async setUserActiveState(id: string, activo: boolean) {
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .update({ activo })
+      .eq("id", id)
+      .select("id, nombre, correo, rol_id, activo")
+      .single();
+
+    if (error || !data)
+      return { ok: false, message: "No se pudo actualizar el estado" };
+
+    const user = data as unknown as UsuarioPOS;
+    return { ok: true, ...this.buildUserResponse(user) };
+  }
+
+  async deactivateUser(id: string) {
+    return this.setUserActiveState(id, false);
+  }
+
+  async restoreUser(id: string) {
+    return this.setUserActiveState(id, true);
   }
 }
