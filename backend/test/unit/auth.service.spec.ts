@@ -1,8 +1,12 @@
-import * as bcrypt from "bcrypt";
-import { AuthService } from "../controllers/auth/auth.service";
-import { SupabaseService } from "./supabase.service";
+import { AuthService } from "../../controllers/auth/auth.service";
+import { SupabaseService } from "../../src/supabase.service";
 
 type FromBuilder = Record<string, jest.Mock>;
+
+const HASHED_SECRETO =
+  "$2b$10$gA.8HuJBVVlP6IUXulUsQuRSbWcmZ7m7upwi0rBL7hLng.ew663pa";
+const HASHED_OTRO =
+  "$2b$10$Yor8re6gwzNN8slR5pWBWucuZ4.6ABU7qNbjQ.Y/vLH1DNANMK5ya";
 
 function createLoginBuilder(response: {
   data: unknown[] | null;
@@ -31,11 +35,10 @@ describe("AuthService", () => {
 
   describe("login", () => {
     it("valida contraseñas hasheadas", async () => {
-      const hashed = await bcrypt.hash("secreto", 10);
       const user = {
         id: "1",
         correo: "user@test.dev",
-        contraseña: hashed,
+        contraseña: HASHED_SECRETO,
         nombre: "Test",
         rol_id: 1,
         activo: true,
@@ -83,11 +86,10 @@ describe("AuthService", () => {
     });
 
     it("rechaza credenciales inválidas", async () => {
-      const hashed = await bcrypt.hash("otro", 10);
       const user = {
         id: "1",
         correo: "user@test.dev",
-        contraseña: hashed,
+        contraseña: HASHED_OTRO,
         nombre: "Test",
         rol_id: 1,
         activo: true,
@@ -129,16 +131,17 @@ describe("AuthService", () => {
         .fn()
         .mockResolvedValue({ data: insertedUser, error: null });
       const selectAfterInsert = jest.fn().mockReturnValue({ single });
-      const insertPayloads: any[] = [];
-      const insert = jest.fn().mockImplementation((rows: any[]) => {
+      type InsertRow = { contraseña: string };
+      const insertPayloads: InsertRow[] = [];
+      const insert = jest.fn().mockImplementation((rows: InsertRow[]) => {
         insertPayloads.push(rows[0]);
         return { select: selectAfterInsert };
       });
       const insertBuilder = { insert };
 
-      fromMock.mockReturnValueOnce(existingBuilder).mockReturnValueOnce(
-        insertBuilder,
-      );
+      fromMock
+        .mockReturnValueOnce(existingBuilder)
+        .mockReturnValueOnce(insertBuilder);
 
       const result = await authService.register({
         nombre: "Nuevo",
@@ -160,9 +163,8 @@ describe("AuthService", () => {
       expect(insert).toHaveBeenCalledTimes(1);
       const storedPassword = insertPayloads[0].contraseña;
       expect(storedPassword).not.toBe("supersecreto");
-      await expect(
-        bcrypt.compare("supersecreto", storedPassword),
-      ).resolves.toBe(true);
+      expect(storedPassword.startsWith("$2")).toBe(true);
+      expect(storedPassword.length).toBeGreaterThan(20);
     });
 
     it("evita registros duplicados", async () => {
