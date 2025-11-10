@@ -76,6 +76,36 @@ curl -X POST http://localhost:5000/api/auth/register \
   }'
 ```
 
+- **Listar usuarios**
+
+```bash
+curl http://localhost:5000/api/auth/users
+```
+
+- **Actualizar usuario**
+
+```bash
+curl -X PATCH http://localhost:5000/api/auth/USER_ID \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Nombre Editado",
+    "rol_id": 2,
+    "activo": true
+  }'
+```
+
+- **Desactivar usuario**
+
+```bash
+curl -X DELETE http://localhost:5000/api/auth/USER_ID
+```
+
+- **Restaurar usuario**
+
+```bash
+curl -X PATCH http://localhost:5000/api/auth/USER_ID/restore
+```
+
 Cada comando devuelve un objeto JSON con la propiedad `ok`. Si `ok` es `false`, revisa el campo `message` para conocer el error devuelto por la API.
 
 ## 8. Notas de seguridad

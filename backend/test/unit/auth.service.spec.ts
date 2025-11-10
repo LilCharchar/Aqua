@@ -8,6 +8,15 @@ const HASHED_SECRETO =
 const HASHED_OTRO =
   "$2b$10$Yor8re6gwzNN8slR5pWBWucuZ4.6ABU7qNbjQ.Y/vLH1DNANMK5ya";
 
+function createGetUsersBuilder(response: {
+  data: unknown[] | null;
+  error: Error | null;
+}): FromBuilder {
+  const order = jest.fn().mockResolvedValue(response);
+  const select = jest.fn().mockReturnValue({ order });
+  return { select };
+}
+
 function createLoginBuilder(response: {
   data: unknown[] | null;
   error: Error | null;
@@ -45,6 +54,50 @@ describe("AuthService", () => {
     authService = new AuthService(
       supabaseService as unknown as SupabaseService,
     );
+  });
+
+  describe("getUsers", () => {
+    it("regresa la lista de usuarios disponibles", async () => {
+      const users = [
+        {
+          id: "1",
+          nombre: "Admin",
+          correo: "admin@test.dev",
+          rol_id: 1,
+          activo: true,
+        },
+      ];
+
+      fromMock.mockReturnValueOnce(
+        createGetUsersBuilder({ data: users, error: null }),
+      );
+
+      const result = await authService.getUsers();
+      expect(result).toEqual({
+        ok: true,
+        users: [
+          {
+            userId: "1",
+            nombre: "Admin",
+            correo: "admin@test.dev",
+            rol: 1,
+            activo: true,
+          },
+        ],
+      });
+    });
+
+    it("retorna error cuando Supabase falla", async () => {
+      fromMock.mockReturnValueOnce(
+        createGetUsersBuilder({ data: null, error: new Error("boom") }),
+      );
+
+      const result = await authService.getUsers();
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudieron obtener los usuarios",
+      });
+    });
   });
 
   describe("login", () => {
@@ -121,6 +174,22 @@ describe("AuthService", () => {
       expect(result).toEqual({
         ok: false,
         message: "Credenciales inválidas",
+      });
+    });
+
+    it("retorna error cuando el usuario no existe", async () => {
+      fromMock.mockReturnValueOnce(
+        createLoginBuilder({ data: [], error: null }),
+      );
+
+      const result = await authService.login({
+        correo: "missing@test.dev",
+        contraseña: "irrelevante",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "Usuario no encontrado",
       });
     });
   });
@@ -202,6 +271,56 @@ describe("AuthService", () => {
         message: "Correo ya registrado",
       });
     });
+
+    it("propaga errores al validar correo existente", async () => {
+      const maybeSingle = jest
+        .fn()
+        .mockResolvedValue({ data: null, error: new Error("db down") });
+      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
+      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
+
+      fromMock.mockReturnValueOnce({ select: selectExisting });
+
+      const result = await authService.register({
+        nombre: "Nuevo",
+        correo: "fallo@test.dev",
+        contraseña: "clave",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "Error verificando correo",
+      });
+    });
+
+    it("retorna error cuando la inserción falla", async () => {
+      const maybeSingle = jest
+        .fn()
+        .mockResolvedValue({ data: null, error: null });
+      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
+      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
+
+      const single = jest
+        .fn()
+        .mockResolvedValue({ data: null, error: new Error("insert fail") });
+      const selectAfterInsert = jest.fn().mockReturnValue({ single });
+      const insert = jest.fn().mockReturnValue({ select: selectAfterInsert });
+
+      fromMock
+        .mockReturnValueOnce({ select: selectExisting })
+        .mockReturnValueOnce({ insert });
+
+      const result = await authService.register({
+        nombre: "Nuevo",
+        correo: "nuevo@test.dev",
+        contraseña: "clave",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudo crear el usuario",
+      });
+    });
   });
 
   describe("updateUser", () => {
@@ -252,6 +371,23 @@ describe("AuthService", () => {
       expect(result).toEqual({
         ok: false,
         message: "No hay cambios para aplicar",
+      });
+    });
+
+    it("retorna error cuando Supabase no actualiza", async () => {
+      const builder = createUpdateBuilder({
+        data: null,
+        error: new Error("update fail"),
+      });
+
+      fromMock.mockReturnValueOnce(builder);
+      const result = await authService.updateUser("1", {
+        nombre: "Sin suerte",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudo actualizar el usuario",
       });
     });
   });
@@ -306,6 +442,21 @@ describe("AuthService", () => {
         correo: "user@test.dev",
         rol: 1,
         activo: true,
+      });
+    });
+
+    it("propaga errores al cambiar estado", async () => {
+      const builder = createUpdateBuilder({
+        data: null,
+        error: new Error("state fail"),
+      });
+
+      fromMock.mockReturnValueOnce(builder);
+      const result = await authService.deactivateUser("1");
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudo actualizar el estado",
       });
     });
   });
