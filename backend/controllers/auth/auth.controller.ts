@@ -24,7 +24,7 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
-  @Get()
+  @Get("users")
   async getUsers() {
     return this.authService.getUsers();
   }
