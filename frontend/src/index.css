@@ -1,12 +1,35 @@
 @import "tailwindcss";
 
-.light{
-    --background: #FAF7F0;
-    --primary: #3E92CC;
-    --secondary: #E6EBEF;
-    --options: #FFFFFF;
-    --text-primary: #5D737E;
-    --text-secondary: #8E8787;
+:root {
+  /* Transición suave al cambiar tema */
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
+.light {
+  --background: #faf7f0;
+  --primary: #3e92cc;
+  --secondary: #e6ebef;
+  --options: #ffffff;
+  --text-primary: #5d737e;
+  --text-secondary: #8e8787;
+}
 
+.dark {
+  --background: #121417;
+  --primary: #1c2431;
+  --secondary: #1e2126;
+  --options: #121417;
+  --warning: #ff8c69;
+  --text-primary: #e6ebef;
+  --text-secondary: #becedb;
+  --text-buttons: #ffffff;
+  --confirmation: #a3c9a8;
+  --secondary-accent: #3e92cc;
+}
+
+/* Aplica las variables */
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
