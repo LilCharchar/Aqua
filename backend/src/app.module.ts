@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 import { SupabaseService } from "./supabase.service";
-import { AuthModule } from "controllers/auth/auth.module";
+import { AuthController } from "./auth/auth.controller";
 
 @Module({
-  imports: [AuthModule],
-  controllers: [],
+  imports: [],
+  controllers: [AuthController],
   providers: [SupabaseService],
 })
 export class AppModule {}
