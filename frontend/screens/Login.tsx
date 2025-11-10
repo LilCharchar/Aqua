@@ -6,6 +6,8 @@ import { MeseroHome } from "../screens/mesero/meseroHome";
 import WaveBackground from "../src/components/wave-background";
 import Input from "../src/components/ui/input";
 import Button from "../src/components/ui/button";
+import logoAqua from "../assets/logo-aqua.svg";
+import ThemeToggle from "../src/components/ui/toggle";
 
 function Login() {
   const [correo, setCorreo] = useState("");
@@ -63,41 +65,48 @@ function Login() {
   if (user?.rol === 3) return <MeseroHome user={user} logout={logout} />;
 
   return (
-    
-    <div className="h-screen w-full relative overflow-hidden bg-[var(--background)] flex flex-col items-center justify-center">
-      <div className=" inset-0 flex items-center justify-center h-full z-10 relative">
-        <div className="shadow-2xl rounded-[61px] bg-[var(--secondary)] relative p-8 pt-[50px] pb-[50px] w-[539] h-[392]">
-              <form className="flex flex-col items-center justify-center gap-5 " onSubmit={handleSubmit}>
-                  <Input
-                    id="correo"
-                    type="email"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="usuario@aqua.local"
-                    required
-                  />
-                  <Input
-                    id="contraseña"
-                    type="password"
-                    value={contraseña}
-                    onChange={(e) => setContrasena(e.target.value)}
-                    placeholder="••••••"
-                    required
-                  />
+    <div className="min-h-screen w-full relative overflow-hidden bg-[var(--background)] flex flex-col items-center justify-center p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <div>
+        <img className="w-80 h-auto" src={logoAqua} alt="aqua" />
+      </div>
+      <div className="w-full max-w-md mx-auto flex items-center justify-center z-10 relative">
+        <div className="shadow-2xl rounded-2xl sm:rounded-[61px] bg-[var(--secondary)] relative w-full p-6 sm:p-10">
+          <form
+            className="flex flex-col items-center justify-center w-full gap-6 sm:gap-7"
+            onSubmit={handleSubmit}
+          >
+            <Input
+              id="correo"
+              type="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="usuario@aqua.local"
+              required
+            />
+            <Input
+              id="contraseña"
+              type="password"
+              value={contraseña}
+              onChange={(e) => setContrasena(e.target.value)}
+              placeholder="••••••"
+              required
+            />
 
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Verificando..." : "Iniciar Sesión"}
-                </Button>
-              </form>
-            {resultado && (
-              <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg text-sm w-full max-w-[400px] text-center">
-            {resultado}
-          </div>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Verificando..." : "Iniciar Sesión"}
+            </Button>
+          </form>
+          {resultado && (
+            <div className="fixed bottom-4 left-4 right-4 sm:absolute sm:-bottom-16 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg text-sm w-full max-w-[400px] text-center">
+              {resultado}
+            </div>
           )}
         </div>
-        
       </div>
-      <WaveBackground/>
+      <WaveBackground />
     </div>
   );
 }
