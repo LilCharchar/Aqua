@@ -1,97 +1,33 @@
-import { Body, Controller, Post } from "@nestjs/common";
-import { SupabaseService } from "../../src/supabase.service";
-import { LoginDto, CreateUserDto } from "./auth.dto";
-
-interface UsuarioPOS {
-  id: string;
-  correo: string;
-  contraseña: string;
-  nombre: string | null;
-  rol_id: string | null;
-  activo: boolean;
-}
+import { Body, Controller, Delete, Param, Patch, Post } from "@nestjs/common";
+import { LoginDto, CreateUserDto, UpdateUserDto } from "./auth.dto";
+import { AuthService } from "./auth.service";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post("login")
   async login(@Body() body: LoginDto) {
-    const supabase = this.supabaseService.getClient();
-
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select(
-        `
-        id,
-        correo,
-        contraseña,
-        nombre,
-        rol_id`,
-      )
-      .eq("correo", body.correo)
-      .limit(1);
-
-    if (error || !data || data.length === 0) {
-      return { ok: false, message: "Usuario no encontrado" };
-    }
-
-    const user = data[0] as unknown as UsuarioPOS;
-
-    if (user.contraseña !== body.contraseña) {
-      return { ok: false, message: "Credenciales inválidas" };
-    }
-
-    return {
-      ok: true,
-      userId: user.id,
-      correo: user.correo,
-      nombre: user.nombre,
-      rol: user.rol_id,
-    };
+    return this.authService.login(body);
   }
 
   @Post("register")
   async register(@Body() dto: CreateUserDto) {
-    const supabase = this.supabaseService.getClient();
+    return this.authService.register(dto);
+  }
 
-    const { data: existing, error: findErr } = await supabase
-      .from("usuarios")
-      .select("id")
-      .eq("correo", dto.correo)
-      .maybeSingle();
+  @Patch(":id")
+  async updateUser(@Param("id") id: string, @Body() dto: UpdateUserDto) {
+    return this.authService.updateUser(id, dto);
+  }
 
-    if (findErr) return { ok: false, message: "Error verificando correo" };
-    if (existing) return { ok: false, message: "Correo ya registrado" };
+  @Delete(":id")
+  async deactivateUser(@Param("id") id: string) {
+    return this.authService.deactivateUser(id);
+  }
 
-    const activo = dto.activo ?? true;
-
-    const { data, error: insErr } = await supabase
-      .from("usuarios")
-      .insert([
-        {
-          nombre: dto.nombre,
-          correo: dto.correo,
-          contraseña: dto.contraseña,
-          rol_id: dto.rol_id ?? null,
-          activo,
-        },
-      ])
-      .select("id, nombre, correo, rol_id, activo")
-      .single();
-
-    const user = data as unknown as UsuarioPOS;
-
-    if (insErr || !user)
-      return { ok: false, message: "No se pudo crear el usuario" };
-
-    return {
-      ok: true,
-      userId: user.id,
-      nombre: user.nombre,
-      correo: user.correo,
-      rol: user.rol_id,
-      activo: user.activo,
-    };
+  @Patch(":id/restore")
+  async restoreUser(@Param("id") id: string) {
+    return this.authService.restoreUser(id);
   }
 }
