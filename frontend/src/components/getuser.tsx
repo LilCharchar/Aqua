@@ -1,5 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Table, type Column } from "./ui/table";
+import SearchBar from "./ui/searchBar";
+import { RotateCw } from "lucide-react";
+import { UserRoundPen } from "lucide-react";
+import { UserRoundX} from "lucide-react";
+import { UserRoundCheck } from "lucide-react";
+import Modal from "./ui/modal";
+import Button from "./ui/button";
+import Input from "./ui/input";
+
+
 
 type UserRow = {
   userId: string;
@@ -21,7 +31,21 @@ const roleLabels: Record<number, string> = {
   3: "Mesero",
 };
 
-const columns: Column<UserRow>[] = [
+
+
+export function Usuarios() {
+  const [usuarios, setUsuarios] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+
+  //Filtros 
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<number | "">("");
+  const [statusFilter, setStatusFilter] = useState<boolean | "">("");
+
+    const columns: Column<UserRow>[] = [
   { header: "ID", accessor: "userId" },
   {
     header: "Usuario",
@@ -40,29 +64,53 @@ const columns: Column<UserRow>[] = [
     accessor: "activo",
     render: (value) => (
       <span
-        className={`px-2 py-1 rounded-full text-xs ${
-          value ? "bg-green-700 text-white" : "bg-red-200 text-red-800"
+        className={`px-2 py-1 rounded-full text-xs manrope-regular ${
+          value ? "bg-[var(--confirmation)] text-[var(--text-buttons)]" : "bg-[var(--warning)] text-[var(--text-buttons)]"
         }`}
       >
         {value ? "Activo" : "Inactivo"}
       </span>
     ),
   },
+  {
+    header: "",
+    accessor: "userId" as const,
+    render: (_value, row) => (
+        <div className="flex items-center gap-5 justify-center">
+            <button 
+                title="Editar usuario"
+                className="text-[var(--text-primary)]  "
+                onClick={() => {
+                    setIsModalOpen(true)
+                    setSelectedUser(row)
+                    }}>
+                <UserRoundPen className="w-5 h-5"/>
+            </button>
+        <button
+            title={row.activo ? "Desactivar usuario" : "Activar usuario"}
+            className={`text-[var(--text-primary)]  `}
+        >
+            {row.activo ? (
+                <UserRoundX className="w-5 h-5"/>
+            ) : (
+                <UserRoundCheck className="w-5 h-5"/>
+            )}    
+        </button>
+    </div>    
+    )
+  },
 ];
 
-export function Usuarios() {
-  const [usuarios, setUsuarios] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
 
-    const fetchUsuarios = async () => {
+
+    const fetchUsuarios = useCallback(async () => {
       setError(null);
+      setLoading(true);
 
       try {
         const res = await fetch("/api/auth/users");
+        
 
         if (!res.ok) {
           throw new Error("No se pudo obtener los usuarios");
@@ -74,42 +122,137 @@ export function Usuarios() {
           throw new Error(body.message ?? "Respuesta inválida del servidor");
         }
 
-        if (isMounted) {
-          setUsuarios(body.users);
-        }
+        setUsuarios(body.users);
       } catch (err) {
-        if (isMounted) {
-          const message =
-            err instanceof Error ? err.message : "Error inesperado";
-          setError(message);
-        }
+        const message =
+          err instanceof Error ? err.message : "Error desconocido";
+        setError(message);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    };
 
-    void fetchUsuarios();
+    }, []);
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    useEffect(() => {
+        void fetchUsuarios();
+  }, [fetchUsuarios]);
+  
+
+  const filteredUsuarios = usuarios.filter((user) => {
+    const matchesSearch =
+      user.nombre?.toLowerCase().includes(search.toLowerCase()) ||
+      user.correo.toLowerCase().includes(search.toLowerCase());
+
+    const matchesRole =
+      roleFilter  ?  user.rol === roleFilter : true;
+    const matchesStatus =
+      statusFilter === "" ? true: user.activo === statusFilter;
+    return matchesSearch && matchesRole && matchesStatus;
+    });
 
   if (loading) {
     return <div className="text-gray-400">Cargando usuarios...</div>;
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-xl">Usuarios</h1>
-      {error && (
-        <div className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
-          {error}
+    <div className="bg-[var(--secondary)] pb-10 rounded-lg shadow-md">
+        <div className="p-6 space-y-4">
+        {error && (
+            <div className="rounded-md bg-red-100 px-3 py-2 text-sm text-[var(--warning)]">
+            {error}
+            </div>
+        )}
+        {/* Controles filtro y buscador */}
+            <div className="flex flex-col gap-3 items-left justify-between">
+                <SearchBar
+                    type="text"
+                    placeholder="Buscar por usuario o correo"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full sm:w-auto"
+                />
+                <div className="flex gap-3">
+                {/* Filtro por rol */}
+                    <select
+                        value={roleFilter}
+                        onChange={(e) =>
+                            setRoleFilter(e.target.value ? Number(e.target.value) : "")
+                        }
+                        className="p-1 border border-gray-300 rounded-md text-xs bg-[var(--options)] text-[var(--text-primary)]"
+                    >
+                        <option value="">Todos los roles</option>
+                        <option value="1">Administrador</option>
+                        <option value="2">Supervisor</option>
+                        <option value="3">Mesero</option>
+                    </select>
+                {/* Filtro por estado */}
+                    <select
+                        value={statusFilter === "" ? "" : statusFilter ? "true" : "false"}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setStatusFilter(
+                                val === "" ? "" : val === "true" ? true : false
+                            );
+                        }}
+                        className="p-1 border border-gray-300 rounded-md text-xs bg-[var(--options)]  text-[var(--text-primary)]"
+                    >
+                        <option value="">Todos los estados</option>
+                        <option value="true">Activo</option>
+                        <option value="false">Inactivo</option>
+                    </select>
+                    {/* Botón de recargar */}
+                    <button
+                        onClick={() => void fetchUsuarios()}
+                            disabled={loading}
+                            className="flex items-center gap-2"
+                    >
+                        <RotateCw className="w-4 h-4 text-[var(--text-primary)] hover:text-[var(--primary)]"/>
+                    </button>
+                        
+                </div>
+            </div>
         </div>
-      )}
-      <Table<UserRow> columns={columns} data={usuarios} />
+        <Table<UserRow> columns={columns} data={filteredUsuarios} />
+
+        <Modal 
+            isOpen={isModalOpen} 
+            onClose={() => {
+                setIsModalOpen(false)
+                setSelectedUser(null)
+            }} 
+            title="Editar Usuario">
+            <div className="flex flex-col gap-4 justify-center items-center">
+                <Input 
+                    type="text" 
+                    placeholder="Nombre"
+                    defaultValue={selectedUser?.nombre ?? ""}
+                    className="p-2 border border-gray-300 rounded" />
+                <Input 
+                type="email" 
+                placeholder="Correo electrónico"
+                defaultValue={selectedUser?.correo ?? ""}
+                className="p-2 border border-gray-300 rounded" />
+                <Input 
+                type="password" 
+                placeholder="Cambiar contraseña"
+                className="p-2 border border-gray-300 rounded" />
+                <select 
+                className="p-3 border border-gray-300 rounded-md text-xs bg-[var(--options)] text-[var(--text-primary)]"
+                defaultValue={selectedUser?.rol ?? "0"}>
+                    <option value="0">Selecciona un rol</option>
+                    <option value="1">Administrador</option>
+                    <option value="2">Supervisor</option>
+                    <option value="3">Mesero</option>
+                </select>
+            
+                <div className="flex gap-5 ">
+                    <Button className="shadow-xl" onClick={() => {/* Lógica para editar usuario */}}>Actualizar</Button>
+                    <Button onClick={() => setIsModalOpen(false)}>
+                    Volver
+                    </Button>
+                </div>
+            </div>
+        </Modal> 
     </div>
   );
 }

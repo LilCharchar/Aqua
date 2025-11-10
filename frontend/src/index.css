@@ -9,9 +9,13 @@
   --background: #faf7f0;
   --primary: #3e92cc;
   --secondary: #e6ebef;
+  --secondary-accent: #BECEDB;
   --options: #ffffff;
   --text-primary: #5d737e;
+  --text-buttons: #ffffff;  
   --text-secondary: #8e8787;
+  --confirmation: #A3C9A8;
+  --warning: #ff8c69;
 }
 
 .dark {
