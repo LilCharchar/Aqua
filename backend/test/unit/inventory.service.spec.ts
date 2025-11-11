@@ -381,6 +381,56 @@ describe("InventoryService", () => {
       getProductSpy.mockRestore();
     });
 
+    it("actualiza categoría y unidad sin modificar inventario", async () => {
+      const updateBuilder = createUpdateProductBuilder();
+      const productRow = {
+        id: 4,
+        nombre: "Producto",
+        descripcion: null,
+        precio: "10.00",
+        unidad: "kg",
+        categoria_id: 2,
+        categoria: { id: 2, nombre: "Mariscos" },
+        inventario: [
+          { id: 9, cantidad_disponible: "3.000", nivel_minimo: "1.000" },
+        ],
+      };
+      const getBuilder = createGetProductBuilder({
+        data: productRow,
+        error: null,
+      });
+
+      fromMock
+        .mockImplementationOnce(() => updateBuilder)
+        .mockImplementationOnce(() => getBuilder);
+
+      const result = await inventoryService.updateProduct(4, {
+        categoria_id: 2,
+        unidad: "kg",
+      });
+
+      expect(updateBuilder.payloads[0]).toEqual({
+        categoria_id: 2,
+        unidad: "kg",
+      });
+      expect(result).toEqual({
+        ok: true,
+        product: {
+          id: 4,
+          nombre: "Producto",
+          descripcion: null,
+          precio: 10,
+          unidad: "kg",
+          categoriaId: 2,
+          categoriaNombre: "Mariscos",
+          inventario: {
+            cantidadDisponible: 3,
+            nivelMinimo: 1,
+          },
+        },
+      });
+    });
+
     it("rechaza solicitudes sin cambios", async () => {
       const result = await inventoryService.updateProduct(1, {});
       expect(result).toEqual({
