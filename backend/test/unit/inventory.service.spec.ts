@@ -2,7 +2,10 @@ import { InventoryService } from "../../controllers/inventory/inventory.service"
 import { SupabaseService } from "../../src/supabase.service";
 
 type ListResponse = { data: unknown[] | null; error: Error | null };
-type SingleResponse = { data: unknown | null; error: Error | null };
+type SingleResponse = {
+  data: Record<string, unknown> | null;
+  error: Error | null;
+};
 
 function createListProductsBuilder(response: ListResponse) {
   const order = jest.fn().mockResolvedValue(response);
@@ -154,6 +157,40 @@ describe("InventoryService", () => {
     });
   });
 
+  describe("listCategories", () => {
+    it("devuelve las categorías disponibles", async () => {
+      const rows = [
+        { id: 1, nombre: "Pescados" },
+        { id: 2, nombre: "Bebidas" },
+      ];
+
+      fromMock.mockImplementationOnce(() =>
+        createListProductsBuilder({ data: rows, error: null }),
+      );
+
+      const result = await inventoryService.listCategories();
+      expect(result).toEqual({
+        ok: true,
+        categories: rows,
+      });
+    });
+
+    it("retorna error cuando supabase falla", async () => {
+      fromMock.mockImplementationOnce(() =>
+        createListProductsBuilder({
+          data: null,
+          error: new Error("down"),
+        }),
+      );
+
+      const result = await inventoryService.listCategories();
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudieron obtener las categorías",
+      });
+    });
+  });
+
   describe("getProductById", () => {
     it("retorna el producto formateado", async () => {
       const row = {
@@ -287,7 +324,7 @@ describe("InventoryService", () => {
           "El producto se creó pero no se pudo inicializar el inventario",
       });
 
-      expect(deleteBuilder.delete as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(deleteBuilder.delete).toHaveBeenCalledTimes(1);
     });
 
     it("valida campos obligatorios", async () => {
@@ -367,7 +404,7 @@ describe("InventoryService", () => {
 
       const result = await inventoryService.deleteProduct(3);
       expect(result).toEqual({ ok: true });
-      expect(deleteBuilder.delete as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(deleteBuilder.delete).toHaveBeenCalledTimes(1);
     });
 
     it("avisa cuando no encuentra el registro", async () => {

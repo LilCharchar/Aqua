@@ -34,6 +34,15 @@ export type ProductResponse =
 
 export type BasicResponse = { ok: true } | { ok: false; message: string };
 
+export interface InventoryCategory {
+  id: number;
+  nombre: string;
+}
+
+export type CategoriesResponse =
+  | { ok: true; categories: InventoryCategory[] }
+  | { ok: false; message: string };
+
 export interface ProductInventoryResponse {
   id: number;
   nombre: string;
@@ -107,11 +116,25 @@ export class InventoryService {
       return { ok: false, message: "No se pudieron obtener los productos" };
     }
 
-    const products = (data ?? []).map((record) =>
-      this.mapProduct(record as unknown as ProductoRow),
-    );
+    const productRecords = (data ?? []) as unknown as ProductoRow[];
+    const products = productRecords.map((record) => this.mapProduct(record));
 
     return { ok: true, products };
+  }
+
+  async listCategories(): Promise<CategoriesResponse> {
+    const supabase = this.supabaseService.getClient();
+    const { data, error } = await supabase
+      .from("categorias")
+      .select("id, nombre")
+      .order("nombre", { ascending: true });
+
+    if (error) {
+      return { ok: false, message: "No se pudieron obtener las categorías" };
+    }
+
+    const categories = (data ?? []) as InventoryCategory[];
+    return { ok: true, categories };
   }
 
   async getProductById(id: number): Promise<ProductResponse> {
@@ -126,10 +149,8 @@ export class InventoryService {
       return { ok: false, message: "Producto no encontrado" };
     }
 
-    return {
-      ok: true,
-      product: this.mapProduct(data as unknown as ProductoRow),
-    };
+    const productRecord = data as unknown as ProductoRow;
+    return { ok: true, product: this.mapProduct(productRecord) };
   }
 
   async createProduct(dto: CreateProductDto): Promise<ProductResponse> {
@@ -199,7 +220,10 @@ export class InventoryService {
       return { ok: false, message: "No se pudo crear el producto" };
     }
 
-    const productId = (productRow as { id: number }).id;
+    const productId = Number((productRow as { id?: number }).id);
+    if (!Number.isFinite(productId)) {
+      return { ok: false, message: "No se pudo crear el producto" };
+    }
     const inventoryPayload: Record<string, unknown> = {
       producto_id: productId,
       cantidad_disponible: cantidadInicial,

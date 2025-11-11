@@ -10,16 +10,21 @@ import {
 import { InventoryService } from "./inventory.service";
 import { CreateProductDto, UpdateProductDto } from "./inventory.dto";
 
-@Controller("inventory/products")
+@Controller("inventory")
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @Get()
+  @Get("products")
   async listProducts() {
     return this.inventoryService.listProducts();
   }
 
-  @Get(":id")
+  @Get("categories")
+  async listCategories() {
+    return this.inventoryService.listCategories();
+  }
+
+  @Get("products/:id")
   async getProduct(@Param("id") id: string) {
     const productId = this.parseNumericId(id);
     if (!productId) {
@@ -28,12 +33,12 @@ export class InventoryController {
     return this.inventoryService.getProductById(productId);
   }
 
-  @Post()
+  @Post("products")
   async createProduct(@Body() dto: CreateProductDto) {
     return this.inventoryService.createProduct(dto);
   }
 
-  @Patch(":id")
+  @Patch("products/:id")
   async updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto) {
     const productId = this.parseNumericId(id);
     if (!productId) {
@@ -42,7 +47,7 @@ export class InventoryController {
     return this.inventoryService.updateProduct(productId, dto);
   }
 
-  @Delete(":id")
+  @Delete("products/:id")
   async deleteProduct(@Param("id") id: string) {
     const productId = this.parseNumericId(id);
     if (!productId) {
