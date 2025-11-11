@@ -46,10 +46,14 @@ function Login() {
       const data = await loginService(correo, contraseña);
 
       if (data?.ok) {
-        setUser({
-          nombre: data.nombre,
-          rol: data.rol,
-        });
+        if (typeof data.rol === "number") {
+          setUser({
+            nombre: data.nombre,
+            rol: data.rol,
+          });
+        } else {
+          setResultado("Tu usuario no tiene un rol asignado");
+        }
       } else {
         setResultado(data?.message ?? "Credenciales inválidas");
       }
