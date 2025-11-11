@@ -3,12 +3,37 @@ import * as bcrypt from "bcrypt";
 import { SupabaseService } from "../../src/supabase.service";
 import { CreateUserDto, LoginDto, UpdateUserDto } from "./auth.dto";
 
+type BcryptHash = (
+  data: string | Buffer,
+  saltOrRounds: string | number,
+) => Promise<string>;
+type BcryptCompare = (
+  data: string | Buffer,
+  encrypted: string,
+) => Promise<boolean>;
+
+interface BcryptModule {
+  hash: BcryptHash;
+  compare: BcryptCompare;
+}
+
+const bcryptModule = bcrypt as unknown as BcryptModule;
+const { hash: bcryptHash, compare: bcryptCompare } = bcryptModule;
+
 interface UsuarioPOS {
   id: string;
   correo: string;
   contraseña: string;
   nombre: string | null;
   rol_id: number | null;
+  activo: boolean;
+}
+
+export interface UserResponse {
+  userId: string;
+  nombre: string | null;
+  correo: string;
+  rol: number | null;
   activo: boolean;
 }
 
@@ -20,7 +45,7 @@ export class AuthService {
     return Boolean(password?.startsWith("$2"));
   }
 
-  private buildUserResponse(user: UsuarioPOS) {
+  private buildUserResponse(user: UsuarioPOS): UserResponse {
     return {
       userId: user.id,
       nombre: user.nombre,
@@ -28,6 +53,33 @@ export class AuthService {
       rol: user.rol_id,
       activo: user.activo,
     };
+  }
+
+  private hashPassword(password: string) {
+    return bcryptHash(password, 10);
+  }
+
+  private comparePassword(password: string, hash: string) {
+    return bcryptCompare(password, hash);
+  }
+
+  async getUsers() {
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id, nombre, correo, rol_id, activo")
+      .order("nombre", { ascending: true });
+
+    if (error || !data) {
+      return { ok: false, message: "No se pudieron obtener los usuarios" };
+    }
+
+    const users = data.map((user) =>
+      this.buildUserResponse(user as unknown as UsuarioPOS),
+    );
+
+    return { ok: true, users };
   }
 
   async login(dto: LoginDto) {
@@ -41,7 +93,8 @@ export class AuthService {
         correo,
         contraseña,
         nombre,
-        rol_id`,
+        rol_id,
+        activo`,
       )
       .eq("correo", dto.correo)
       .limit(1);
@@ -55,11 +108,15 @@ export class AuthService {
     const storedPassword = user.contraseña ?? "";
     const shouldUseHash = this.isHashedPassword(storedPassword);
     const isValid = shouldUseHash
-      ? await bcrypt.compare(dto.contraseña, storedPassword)
+      ? await this.comparePassword(dto.contraseña, storedPassword)
       : storedPassword === dto.contraseña;
 
     if (!isValid) {
       return { ok: false, message: "Credenciales inválidas" };
+    }
+
+    if (!user.activo) {
+      return { ok: false, message: "Usuario desactivado" };
     }
 
     return {
@@ -84,7 +141,7 @@ export class AuthService {
     if (existing) return { ok: false, message: "Correo ya registrado" };
 
     const activo = dto.activo ?? true;
-    const hashedPassword = await bcrypt.hash(dto.contraseña, 10);
+    const hashedPassword = await this.hashPassword(dto.contraseña);
 
     const { data, error: insErr } = await supabase
       .from("usuarios")
@@ -117,7 +174,7 @@ export class AuthService {
     if (dto.rol_id !== undefined) payload.rol_id = dto.rol_id ?? null;
     if (dto.activo !== undefined) payload.activo = dto.activo;
     if (dto.contraseña) {
-      payload.contraseña = await bcrypt.hash(dto.contraseña, 10);
+      payload.contraseña = await this.hashPassword(dto.contraseña);
     }
 
     if (Object.keys(payload).length === 0) {
