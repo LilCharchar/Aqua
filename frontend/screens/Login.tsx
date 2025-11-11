@@ -24,7 +24,17 @@ function Login() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ correo, contraseña }),
     });
-    return res.json();
+
+    const body = await res
+      .clone()
+      .json()
+      .catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(body?.message ?? "No se pudo iniciar sesión");
+    }
+
+    return body ?? {};
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -35,17 +45,18 @@ function Login() {
     try {
       const data = await loginService(correo, contraseña);
 
-      if (data.ok) {
+      if (data?.ok) {
         setUser({
           nombre: data.nombre,
           rol: data.rol,
         });
       } else {
-        setResultado(data.message ?? "Credenciales inválidas");
+        setResultado(data?.message ?? "Credenciales inválidas");
       }
     } catch (err) {
-      console.log(err);
-      setResultado("Error de red o servidor caído");
+      const message =
+        err instanceof Error ? err.message : "Error de red o servidor caído";
+      setResultado(message);
     } finally {
       setLoading(false);
     }

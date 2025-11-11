@@ -177,6 +177,31 @@ describe("AuthService", () => {
       });
     });
 
+    it("bloquea usuarios inactivos aunque la contraseña sea válida", async () => {
+      const user = {
+        id: "1",
+        correo: "user@test.dev",
+        contraseña: HASHED_SECRETO,
+        nombre: "Test",
+        rol_id: 1,
+        activo: false,
+      };
+
+      fromMock.mockReturnValueOnce(
+        createLoginBuilder({ data: [user], error: null }),
+      );
+
+      const result = await authService.login({
+        correo: "user@test.dev",
+        contraseña: "secreto",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "Usuario desactivado",
+      });
+    });
+
     it("retorna error cuando el usuario no existe", async () => {
       fromMock.mockReturnValueOnce(
         createLoginBuilder({ data: [], error: null }),
