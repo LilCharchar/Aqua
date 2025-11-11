@@ -93,7 +93,8 @@ export class AuthService {
         correo,
         contraseña,
         nombre,
-        rol_id`,
+        rol_id,
+        activo`,
       )
       .eq("correo", dto.correo)
       .limit(1);
@@ -112,6 +113,10 @@ export class AuthService {
 
     if (!isValid) {
       return { ok: false, message: "Credenciales inválidas" };
+    }
+
+    if (!user.activo) {
+      return { ok: false, message: "Usuario desactivado" };
     }
 
     return {
