@@ -1,14 +1,17 @@
 import React from "react";
 
-export type Column<T, K extends keyof T = keyof T> = {
+export type Column<T> = {
   header: string;
-  accessor: K;
-  render?: (value: T[K], row: T) => React.ReactNode;
+  accessor: keyof T;
+  render?: (value: unknown, row: T) => React.ReactNode;
+  width?: string;
+  cellClassName?: string;
 };
 
 interface TableProps<T> {
   data: T[];
   columns: Column<T>[];
+  tableClassName?: string;
 }
 
 export function Table<T>({ columns, data }: TableProps<T>) {

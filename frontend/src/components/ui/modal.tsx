@@ -6,6 +6,7 @@ type ModalProps = {
     title?: string;
     children: React.ReactNode;
     width?: string;
+    closeOnBackdrop?: boolean;
 };
 
 const Modal: React.FC<ModalProps> = ({
@@ -14,12 +15,13 @@ const Modal: React.FC<ModalProps> = ({
   title,
   children,
   width = "max-w-2xl",
+  closeOnBackdrop = true,
 }) => {
   if (!isOpen) return null;
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={closeOnBackdrop ? onClose : undefined}
       role="presentation"
     >
       <div
@@ -28,14 +30,6 @@ const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
       >
-        <button
-          type="button"
-          aria-label="Cerrar"
-          className="absolute top-4 right-4 text-xl hover:opacity-80"
-          onClick={onClose}
-        >
-          ×
-        </button>
         <div className="flex justify-center items-center mb-6">
           <h2 className="text-2xl manrope-bold">{title}</h2>
         </div>
