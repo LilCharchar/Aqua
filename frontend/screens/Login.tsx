@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { User } from "./types";
 import { AdminHome } from "../screens/admin/adminHome";
-import { SupervisorHome } from "../screens/supervisor/supervisorHome";
 import { MeseroHome } from "../screens/mesero/meseroHome";
+import SupervisorApp from "./supervisor/SupervisorApp";
 import WaveBackground from "../src/components/wave-background";
 import Input from "../src/components/ui/input";
 import Button from "../src/components/ui/button";
@@ -76,7 +76,7 @@ function Login() {
 
   // ✅ Navegación por rol
   if (user?.rol === 1) return <AdminHome user={user} logout={logout} />;
-  if (user?.rol === 2) return <SupervisorHome user={user} logout={logout} />;
+  if (user?.rol === 2) return <SupervisorApp user={user} logout={logout} />;
   if (user?.rol === 3) return <MeseroHome user={user} logout={logout} />;
 
   return (

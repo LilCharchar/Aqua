@@ -1,6 +1,4 @@
 import type { User } from "../types";
-import Navbar from "../../src/components/ui/Sidebar";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 type MeseroHomeProps = {
   user: User;
@@ -9,7 +7,7 @@ type MeseroHomeProps = {
 
 export function MeseroHome({ user, logout }: MeseroHomeProps) {
   return (
-    <div>
+    <div >
       
       <h1>Mesero: {user.nombre}</h1>
       <button onClick={logout}>Cerrar sesión</button>

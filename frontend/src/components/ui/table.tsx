@@ -16,7 +16,7 @@ interface TableProps<T> {
 
 export function Table<T>({ columns, data }: TableProps<T>) {
   return (
-    <div className="overflow-x-auto bg-[var(--secondary)] text-[var(--text-primary)]">
+    <div className="overflow-x-auto min-h-[50vh] bg-[var(--secondary)] text-[var(--text-primary)]">
       <table className="min-w-full text-left border-collapse">
         <thead className="bg-[var(--secondary-accent)] manrope-regular">
           <tr>

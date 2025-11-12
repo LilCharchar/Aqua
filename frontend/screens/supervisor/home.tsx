@@ -1,12 +1,12 @@
 import type { User } from "../types";
 import Separator from "../../src/components/separator";
 
-type SupervisorDashboardProps = {
+type SupervisorHomeProps = {
   user: User;
   logout: () => void;
 };
 
-export function Dashboard({ user, logout }: SupervisorDashboardProps) {
+export function Home({ user, logout }: SupervisorHomeProps) {
   return (
     <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
         <div className="m-10">
@@ -17,7 +17,7 @@ export function Dashboard({ user, logout }: SupervisorDashboardProps) {
                   </div>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className=" text-3xl manrope-bold">Dashboard</span>
+                  <span className=" text-3xl manrope-bold">Arqueo de caja</span>
                 </div>
                 
                 <Separator />
@@ -25,4 +25,4 @@ export function Dashboard({ user, logout }: SupervisorDashboardProps) {
     </div>
   );
 }
-export default Dashboard;
+export default Home;
