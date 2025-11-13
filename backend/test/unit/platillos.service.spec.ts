@@ -1,8 +1,11 @@
-import { PlatillosService } from "../../controllers/platillos/platillos.service";
+import { PlatillosService } from "../../controllers/plates/platillos.service";
 import { SupabaseService } from "../../src/supabase.service";
 
 type ListResponse = { data: unknown[] | null; error: Error | null };
-type SingleResponse = { data: Record<string, unknown> | null; error: Error | null };
+type SingleResponse = {
+  data: Record<string, unknown> | null;
+  error: Error | null;
+};
 
 function createListBuilder(response: ListResponse) {
   const order = jest.fn().mockResolvedValue(response);
@@ -21,29 +24,35 @@ function createInsertPlatilloBuilder(response: SingleResponse) {
   const single = jest.fn().mockResolvedValue(response);
   const select = jest.fn().mockReturnValue({ single });
   const payloads: Record<string, unknown>[] = [];
-  const insert = jest.fn().mockImplementation((rows: Record<string, unknown>[]) => {
-    payloads.push(rows[0]);
-    return { select };
-  });
+  const insert = jest
+    .fn()
+    .mockImplementation((rows: Record<string, unknown>[]) => {
+      payloads.push(rows[0]);
+      return { select };
+    });
   return { insert, payloads };
 }
 
 function createIngredientInsertBuilder(error: Error | null = null) {
   const payloads: Record<string, unknown>[] = [];
-  const insert = jest.fn().mockImplementation((rows: Record<string, unknown>[]) => {
-    payloads.push(rows[0]);
-    return Promise.resolve({ error });
-  });
+  const insert = jest
+    .fn()
+    .mockImplementation((rows: Record<string, unknown>[]) => {
+      payloads.push(rows[0]);
+      return Promise.resolve({ error });
+    });
   return { insert, payloads };
 }
 
 function createUpdateBuilder(error: Error | null = null) {
   const payloads: Record<string, unknown>[] = [];
   const eq = jest.fn().mockResolvedValue({ error });
-  const update = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
-    payloads.push(payload);
-    return { eq };
-  });
+  const update = jest
+    .fn()
+    .mockImplementation((payload: Record<string, unknown>) => {
+      payloads.push(payload);
+      return { eq };
+    });
   return { update, payloads };
 }
 
@@ -71,7 +80,7 @@ describe("PlatillosService", () => {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
     };
     platillosService = new PlatillosService(
-      supabaseService as unknown as SupabaseService,
+      supabaseService as unknown as SupabaseService
     );
   });
 
@@ -99,7 +108,7 @@ describe("PlatillosService", () => {
       ];
 
       fromMock.mockImplementationOnce(() =>
-        createListBuilder({ data: rows, error: null }),
+        createListBuilder({ data: rows, error: null })
       );
 
       const result = await platillosService.listPlatillos();
@@ -131,7 +140,7 @@ describe("PlatillosService", () => {
 
     it("propaga el error de supabase", async () => {
       fromMock.mockImplementationOnce(() =>
-        createListBuilder({ data: null, error: new Error("fail") }),
+        createListBuilder({ data: null, error: new Error("fail") })
       );
 
       const result = await platillosService.listPlatillos();
@@ -204,7 +213,9 @@ describe("PlatillosService", () => {
         data: { id: 11 },
         error: null,
       });
-      const ingredientBuilder = createIngredientInsertBuilder(new Error("fail"));
+      const ingredientBuilder = createIngredientInsertBuilder(
+        new Error("fail")
+      );
       const deleteBuilder = createDeleteBuilder(null);
 
       fromMock
@@ -220,7 +231,8 @@ describe("PlatillosService", () => {
 
       expect(result).toEqual({
         ok: false,
-        message: "El platillo se creó pero no se pudieron guardar los ingredientes",
+        message:
+          "El platillo se creó pero no se pudieron guardar los ingredientes",
       });
       expect(deleteBuilder.delete).toHaveBeenCalledTimes(1);
     });
