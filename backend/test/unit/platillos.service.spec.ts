@@ -1,4 +1,4 @@
-import { PlatillosService } from "../../controllers/plates/platillos.service";
+import { PlatillosService } from "../../controllers/platillo/platillos.service";
 import { SupabaseService } from "../../src/supabase.service";
 
 type ListResponse = { data: unknown[] | null; error: Error | null };

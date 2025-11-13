@@ -349,6 +349,10 @@ export class PlatillosService {
     id: number,
     dto: UpdatePlatilloDto,
   ): Promise<PlatilloSingleResponse> {
+    if (!dto || typeof dto !== "object") {
+      return { ok: false, message: "Datos de actualización inválidos" };
+    }
+
     const payload: Record<string, unknown> = {};
 
     if (dto.nombre !== undefined) {
