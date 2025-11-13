@@ -38,7 +38,6 @@ type CategoriesResponse =
 const initialCreateForm = {
   nombre: "",
   descripcion: "",
-  precio: "",
   unidad: "pza",
   cantidad_inicial: "",
   nivel_minimo: "",
@@ -48,7 +47,6 @@ const initialCreateForm = {
 const initialEditForm = {
   nombre: "",
   descripcion: "",
-  precio: "",
   unidad: "",
   nivel_minimo: "",
   categoria_id: "",
@@ -154,7 +152,6 @@ export function Inventory({ user, logout }: InventoryProps) {
       setEditForm({
         nombre: editModalProduct.nombre,
         descripcion: editModalProduct.descripcion ?? "",
-        precio: editModalProduct.precio ? String(editModalProduct.precio) : "",
         unidad: editModalProduct.unidad ?? "",
         nivel_minimo:
           editModalProduct.inventario.nivelMinimo !== null
@@ -190,14 +187,6 @@ export function Inventory({ user, logout }: InventoryProps) {
     const bodyPayload: Record<string, unknown> = { nombre };
     if (createForm.descripcion.trim()) {
       bodyPayload.descripcion = createForm.descripcion.trim();
-    }
-    if (createForm.precio) {
-      const precio = Number(createForm.precio);
-      if (Number.isNaN(precio) || precio < 0) {
-        setCreateError("El precio debe ser mayor o igual a 0");
-        return;
-      }
-      bodyPayload.precio = precio;
     }
     if (createForm.unidad.trim()) {
       bodyPayload.unidad = createForm.unidad.trim();
@@ -347,19 +336,6 @@ export function Inventory({ user, logout }: InventoryProps) {
       payload.descripcion = trimmedDescription;
     }
 
-    if (editForm.precio) {
-      const precio = Number(editForm.precio);
-      if (Number.isNaN(precio) || precio < 0) {
-        setEditError("El precio debe ser mayor o igual a 0");
-        return;
-      }
-      if (precio !== editModalProduct.precio) {
-        payload.precio = precio;
-      }
-    } else if (editModalProduct.precio !== 0) {
-      payload.precio = 0;
-    }
-
     const unidad = editForm.unidad.trim();
     if (!unidad) {
       setEditError("La unidad es obligatoria");
@@ -471,11 +447,6 @@ export function Inventory({ user, logout }: InventoryProps) {
         render: (v) => v ?? "Sin descripción",
         width:"28%",
         cellClassName: "truncate"
-      },
-      {
-        header: "Precio",
-        accessor: "precio",
-        render: (v) => (typeof v === "number" ? `$${v.toFixed(2)}` : v),
       },
       {
         header: "Disponibles",
@@ -617,25 +588,13 @@ export function Inventory({ user, logout }: InventoryProps) {
               }))
             }
           />
-          <div className="flex flex-col sm:flex-row gap-4 w-full justify-between">
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Precio"
-              value={createForm.precio}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, precio: e.target.value }))
-              }
-            />
-            <Input
-              placeholder="Unidad (ej. kg, pza)"
-              value={createForm.unidad}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, unidad: e.target.value }))
-              }
-            />
-          </div>
+          <Input
+            placeholder="Unidad (ej. kg, pza)"
+            value={createForm.unidad}
+            onChange={(e) =>
+              setCreateForm((prev) => ({ ...prev, unidad: e.target.value }))
+            }
+          />
           <div className="flex flex-col w-full">
             <label className="text-sm mb-1 manrope-light">
               <span className="ml-1 text-xs text-[var(--text-secondary)]">
@@ -741,33 +700,17 @@ export function Inventory({ user, logout }: InventoryProps) {
                 }))
               }
             />
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Precio"
-                value={editForm.precio}
-                onChange={(event) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    precio: event.target.value,
-                  }))
-                }
-                required
-              />
-              <Input
-                placeholder="Unidad"
-                value={editForm.unidad}
-                onChange={(event) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    unidad: event.target.value,
-                  }))
-                }
-                required
-              />
-            </div>
+            <Input
+              placeholder="Unidad"
+              value={editForm.unidad}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  unidad: event.target.value,
+                }))
+              }
+              required
+            />
             <div className="flex flex-col sm:flex-row gap-4 w-full">
               <select
                 value={editForm.categoria_id}
