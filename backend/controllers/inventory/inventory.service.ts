@@ -17,7 +17,6 @@ interface ProductoRow {
   id: number;
   nombre: string;
   descripcion: string | null;
-  precio: string | number;
   unidad: string;
   categoria_id: number | null;
   categoria?: CategoriaRow | null;
@@ -47,7 +46,6 @@ export interface ProductInventoryResponse {
   id: number;
   nombre: string;
   descripcion: string | null;
-  precio: number;
   unidad: string;
   categoriaId: number | null;
   categoriaNombre: string | null;
@@ -65,7 +63,6 @@ export class InventoryService {
     id,
     nombre,
     descripcion,
-    precio,
     unidad,
     categoria_id,
     categoria:categorias ( id, nombre ),
@@ -94,7 +91,6 @@ export class InventoryService {
       id: record.id,
       nombre: record.nombre,
       descripcion: record.descripcion ?? null,
-      precio: this.normalizeDecimal(record.precio) ?? 0,
       unidad: record.unidad ?? "pza",
       categoriaId: record.categoria_id ?? null,
       categoriaNombre: record.categoria?.nombre ?? null,
@@ -159,11 +155,6 @@ export class InventoryService {
       return { ok: false, message: "El nombre es obligatorio" };
     }
 
-    const precio = dto.precio !== undefined ? Number(dto.precio) : 0;
-    if (Number.isNaN(precio) || precio < 0) {
-      return { ok: false, message: "El precio debe ser mayor o igual a 0" };
-    }
-
     const cantidadInicial =
       dto.cantidad_inicial !== undefined ? Number(dto.cantidad_inicial) : 0;
     if (Number.isNaN(cantidadInicial) || cantidadInicial < 0) {
@@ -208,7 +199,6 @@ export class InventoryService {
         {
           nombre,
           descripcion,
-          precio,
           categoria_id: categoriaId,
           unidad,
         },
@@ -270,14 +260,6 @@ export class InventoryService {
       const descripcion =
         typeof dto.descripcion === "string" ? dto.descripcion.trim() : "";
       productPayload.descripcion = descripcion || null;
-    }
-
-    if (dto.precio !== undefined) {
-      const precio = Number(dto.precio);
-      if (Number.isNaN(precio) || precio < 0) {
-        return { ok: false, message: "El precio debe ser mayor o igual a 0" };
-      }
-      productPayload.precio = precio;
     }
 
     if (dto.categoria_id !== undefined) {
