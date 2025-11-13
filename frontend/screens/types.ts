@@ -10,7 +10,6 @@ export type InventoryProduct = {
   id: number;
   nombre: string;
   descripcion: string | null;
-  precio: number;
   unidad: string;
   categoriaId: number | null;
   categoriaNombre: string | null;

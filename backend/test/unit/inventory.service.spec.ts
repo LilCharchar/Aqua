@@ -106,7 +106,6 @@ describe("InventoryService", () => {
           id: 1,
           nombre: "Camarón",
           descripcion: null,
-          precio: "120.50",
           unidad: "kg",
           categoria_id: 2,
           categoria: { id: 2, nombre: "Mariscos" },
@@ -128,7 +127,6 @@ describe("InventoryService", () => {
             id: 1,
             nombre: "Camarón",
             descripcion: null,
-            precio: 120.5,
             unidad: "kg",
             categoriaId: 2,
             categoriaNombre: "Mariscos",
@@ -197,7 +195,6 @@ describe("InventoryService", () => {
         id: 10,
         nombre: "Pulpo",
         descripcion: "Fresco",
-        precio: "99.99",
         unidad: "kg",
         categoria_id: null,
         categoria: null,
@@ -217,7 +214,6 @@ describe("InventoryService", () => {
           id: 10,
           nombre: "Pulpo",
           descripcion: "Fresco",
-          precio: 99.99,
           unidad: "kg",
           categoriaId: null,
           categoriaNombre: null,
@@ -260,7 +256,6 @@ describe("InventoryService", () => {
           id: 5,
           nombre: "Nuevo",
           descripcion: "Producto",
-          precio: 55.5,
           unidad: "pza",
           categoriaId: 3,
           categoriaNombre: "Categoria",
@@ -275,7 +270,6 @@ describe("InventoryService", () => {
       const result = await inventoryService.createProduct({
         nombre: "  Nuevo ",
         descripcion: " Producto ",
-        precio: 55.5,
         categoria_id: 3,
         unidad: "pza",
         cantidad_inicial: 10,
@@ -286,7 +280,6 @@ describe("InventoryService", () => {
       expect(insertBuilder.payloads[0]).toEqual({
         nombre: "Nuevo",
         descripcion: "Producto",
-        precio: 55.5,
         categoria_id: 3,
         unidad: "pza",
       });
@@ -314,7 +307,6 @@ describe("InventoryService", () => {
 
       const result = await inventoryService.createProduct({
         nombre: "Test",
-        precio: 10,
         cantidad_inicial: 1,
       });
 
@@ -353,7 +345,6 @@ describe("InventoryService", () => {
           id: 9,
           nombre: "Actualizado",
           descripcion: null,
-          precio: 10,
           unidad: "pza",
           categoriaId: null,
           categoriaNombre: null,
@@ -387,7 +378,6 @@ describe("InventoryService", () => {
         id: 4,
         nombre: "Producto",
         descripcion: null,
-        precio: "10.00",
         unidad: "kg",
         categoria_id: 2,
         categoria: { id: 2, nombre: "Mariscos" },
@@ -419,7 +409,6 @@ describe("InventoryService", () => {
           id: 4,
           nombre: "Producto",
           descripcion: null,
-          precio: 10,
           unidad: "kg",
           categoriaId: 2,
           categoriaNombre: "Mariscos",
