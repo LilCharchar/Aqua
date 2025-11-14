@@ -161,8 +161,10 @@ http://localhost:5173/?view=lab
 
 La pantalla te deja:
 - Visualizar los platillos disponibles.
+- Crear platillos nuevos (incluyendo ingredientes).
 - Crear órdenes especificando mesa, mesero y los ítems.
 - Agregar platillos a órdenes existentes.
-- Consultar una orden por ID para revisar totales y pagos.
+- Consultar una orden por ID para revisar totales e ítems.
+- Registrar pagos y actualizar el estado de la orden, viendo el historial resultante.
 
 Por defecto usa `http://localhost:5000/api` como base; si necesitás apuntar a otra URL, define `VITE_API_URL` en el entorno del frontend antes de ejecutar `npm run dev`.
