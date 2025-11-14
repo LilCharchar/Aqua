@@ -19,3 +19,7 @@ export class RegisterPaymentDto {
   monto!: number;
   cambio?: number | null;
 }
+
+export class AddOrderItemsDto {
+  items!: OrderItemDto[];
+}

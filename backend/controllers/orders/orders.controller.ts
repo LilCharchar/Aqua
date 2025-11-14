@@ -8,6 +8,7 @@ import {
   Query,
 } from "@nestjs/common";
 import {
+  AddOrderItemsDto,
   CreateOrderDto,
   RegisterPaymentDto,
   UpdateOrderStatusDto,
@@ -47,6 +48,15 @@ export class OrdersController {
       return { ok: false, message: "ID inválido" };
     }
     return this.ordersService.updateOrderStatus(orderId, dto);
+  }
+
+  @Post(":id/items")
+  async addItems(@Param("id") id: string, @Body() dto: AddOrderItemsDto) {
+    const orderId = this.parseNumericId(id);
+    if (!orderId) {
+      return { ok: false, message: "ID inválido" };
+    }
+    return this.ordersService.addItems(orderId, dto);
   }
 
   @Post(":id/payments")

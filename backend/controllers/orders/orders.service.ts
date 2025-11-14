@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../src/supabase.service";
 import {
+  AddOrderItemsDto,
   CreateOrderDto,
   OrderItemDto,
   RegisterPaymentDto,
@@ -260,51 +261,15 @@ export class OrdersService {
 
     const supabase = this.supabaseService.getClient();
 
-    const platilloIds = itemsValidation.items.map((item) => item.platilloId);
-
-    const { data: platillosData, error: platillosError } = await supabase
-      .from("platillos")
-      .select("id, precio, disponible")
-      .in("id", platilloIds);
-
-    if (platillosError) {
-      return { ok: false, message: "No se pudieron validar los platillos" };
+    const detailResult = await this.buildDetailPayload(
+      itemsValidation.items,
+      supabase,
+    );
+    if (!detailResult.ok) {
+      return detailResult;
     }
-
-    const priceMap = new Map<number, PlatilloPrecioRow>();
-    for (const row of (platillosData ?? []) as unknown as PlatilloPrecioRow[]) {
-      priceMap.set(row.id, row);
-    }
-
-    const detailPayload: DetailInsertRow[] = [];
-    let total = 0;
-
-    for (const item of itemsValidation.items) {
-      const platillo = priceMap.get(item.platilloId);
-      if (!platillo) {
-        return { ok: false, message: `Platillo ${item.platilloId} no existe` };
-      }
-
-      if (!platillo.disponible) {
-        return {
-          ok: false,
-          message: `El platillo ${item.platilloId} no está disponible`,
-        };
-      }
-
-      const unitPrice = this.normalizeDecimal(platillo.precio) ?? 0;
-      const precioUnit = this.toCurrency(unitPrice);
-      const subtotal = this.toCurrency(precioUnit * item.cantidad);
-
-      total += subtotal;
-
-      detailPayload.push({
-        platillo_id: item.platilloId,
-        cantidad: item.cantidad,
-        precio_unit: precioUnit,
-        subtotal,
-      });
-    }
+    const detailPayload = detailResult.detailPayload;
+    const totalIncrement = detailResult.total;
 
     const inventoryResult = await this.calculateInventoryAdjustments(
       itemsValidation.items,
@@ -322,7 +287,7 @@ export class OrdersService {
           mesa_id: mesaId,
           mesero_id: meseroId,
           estado: normalizedStatus,
-          total: this.toCurrency(total),
+          total: this.toCurrency(totalIncrement),
         },
       ])
       .select("id")
@@ -358,6 +323,102 @@ export class OrdersService {
 
       if (inventoryUpdateError) {
         await this.rollbackOrder(orderId, supabase);
+        return {
+          ok: false,
+          message: "No se pudo actualizar el inventario",
+        };
+      }
+    }
+
+    return this.getOrderById(orderId);
+  }
+
+  async addItems(
+    orderId: number,
+    dto: AddOrderItemsDto,
+  ): Promise<OrderSingleResponse> {
+    const itemsValidation = this.validateItems(dto.items);
+    if (!itemsValidation.ok) {
+      return itemsValidation;
+    }
+
+    const supabase = this.supabaseService.getClient();
+
+    const { data: orderData, error: orderError } = await supabase
+      .from("ordenes")
+      .select("id, total")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (orderError || !orderData) {
+      return { ok: false, message: "Orden no encontrada" };
+    }
+
+    const orderRow = orderData as { id: number; total: string | number | null };
+
+    const detailResult = await this.buildDetailPayload(
+      itemsValidation.items,
+      supabase,
+    );
+    if (!detailResult.ok) {
+      return detailResult;
+    }
+
+    const inventoryResult = await this.calculateInventoryAdjustments(
+      itemsValidation.items,
+      supabase,
+    );
+    if (!inventoryResult.ok) {
+      return inventoryResult;
+    }
+
+    const currentTotal = this.toCurrency(
+      this.normalizeDecimal(orderRow.total) ?? 0,
+    );
+    const newTotal = this.toCurrency(currentTotal + detailResult.total);
+
+    const detailRows = detailResult.detailPayload.map((item) => ({
+      orden_id: orderId,
+      ...item,
+    }));
+
+    const { data: insertedRows, error: detailError } = await supabase
+      .from("detalle_orden")
+      .insert(detailRows)
+      .select("id");
+
+    if (detailError || !insertedRows) {
+      return {
+        ok: false,
+        message: "No se pudieron agregar los platillos",
+      };
+    }
+
+    const detailIds = (insertedRows as { id: number }[]).map((row) => row.id);
+
+    const { error: totalError } = await supabase
+      .from("ordenes")
+      .update({ total: newTotal })
+      .eq("id", orderId);
+
+    if (totalError) {
+      await this.deleteOrderDetails(detailIds, supabase);
+      return {
+        ok: false,
+        message: "No se pudo actualizar el total de la orden",
+      };
+    }
+
+    if (inventoryResult.updates.length > 0) {
+      const { error: inventoryError } = await supabase
+        .from("inventario")
+        .upsert(inventoryResult.updates, { onConflict: "producto_id" });
+      if (inventoryError) {
+        await this.deleteOrderDetails(detailIds, supabase);
+        await supabase
+          .from("ordenes")
+          .update({ total: currentTotal })
+          .eq("id", orderId);
         return {
           ok: false,
           message: "No se pudo actualizar el inventario",
@@ -558,6 +619,76 @@ export class OrdersService {
     }
 
     return { ok: true, updates };
+  }
+
+  private async buildDetailPayload(
+    items: NormalizedOrderItem[],
+    supabase: SupabaseClient,
+  ): Promise<
+    | { ok: true; detailPayload: DetailInsertRow[]; total: number }
+    | { ok: false; message: string }
+  > {
+    if (items.length === 0) {
+      return { ok: true, detailPayload: [], total: 0 };
+    }
+
+    const platilloIds = items.map((item) => item.platilloId);
+    const { data, error } = await supabase
+      .from("platillos")
+      .select("id, precio, disponible")
+      .in("id", platilloIds);
+
+    if (error) {
+      return { ok: false, message: "No se pudieron validar los platillos" };
+    }
+
+    const priceMap = new Map<number, PlatilloPrecioRow>();
+    for (const row of (data ?? []) as unknown as PlatilloPrecioRow[]) {
+      priceMap.set(row.id, row);
+    }
+
+    const detailPayload: DetailInsertRow[] = [];
+    let total = 0;
+
+    for (const item of items) {
+      const platillo = priceMap.get(item.platilloId);
+      if (!platillo) {
+        return {
+          ok: false,
+          message: `Platillo ${item.platilloId} no existe`,
+        };
+      }
+
+      if (!platillo.disponible) {
+        return {
+          ok: false,
+          message: `El platillo ${item.platilloId} no está disponible`,
+        };
+      }
+
+      const unitPrice = this.normalizeDecimal(platillo.precio) ?? 0;
+      const precioUnit = this.toCurrency(unitPrice);
+      const subtotal = this.toCurrency(precioUnit * item.cantidad);
+
+      total += subtotal;
+
+      detailPayload.push({
+        platillo_id: item.platilloId,
+        cantidad: item.cantidad,
+        precio_unit: precioUnit,
+        subtotal,
+      });
+    }
+
+    return { ok: true, detailPayload, total: this.toCurrency(total) };
+  }
+
+  private async deleteOrderDetails(
+    detailIds: number[],
+    supabase: SupabaseClient,
+  ) {
+    if (!detailIds.length) return;
+    await supabase.from("detalle_orden").delete().in("id", detailIds);
   }
 
   private mapOrder(record: OrdenRow): OrderResponse {

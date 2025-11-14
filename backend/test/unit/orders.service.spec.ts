@@ -68,6 +68,24 @@ function createDetailInsertBuilder(error: Error | null = null) {
   return { insert, payloads };
 }
 
+function createDetailInsertReturningBuilder(
+  rows: { id: number }[],
+  error: Error | null = null,
+) {
+  const payloads: Record<string, unknown>[][] = [];
+  const select = jest.fn().mockResolvedValue({
+    data: rows,
+    error,
+  });
+  const insert = jest
+    .fn()
+    .mockImplementation((items: Record<string, unknown>[]) => {
+      payloads.push(items.map((row) => ({ ...row })));
+      return { select };
+    });
+  return { insert, payloads };
+}
+
 function createInventoryUpsertBuilder(error: Error | null = null) {
   const payloads: Record<string, unknown>[][] = [];
   const options: Record<string, unknown>[] = [];
@@ -88,6 +106,18 @@ function createGetOrderBuilder(response: SingleResponse) {
   const eq = jest.fn().mockReturnValue({ maybeSingle });
   const select = jest.fn().mockReturnValue({ eq });
   return { select };
+}
+
+function createOrderTotalUpdateBuilder(error: Error | null = null) {
+  const payloads: Record<string, unknown>[] = [];
+  const eq = jest.fn().mockResolvedValue({ error, data: null });
+  const update = jest
+    .fn()
+    .mockImplementation((payload: Record<string, unknown>) => {
+      payloads.push(payload);
+      return { eq };
+    });
+  return { update, payloads };
 }
 
 describe("OrdersService", () => {
@@ -434,6 +464,184 @@ describe("OrdersService", () => {
         message: "No hay suficiente inventario para Camarón",
       });
       expect(fromMock).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("addItems", () => {
+    it("agrega platillos a una orden existente y descuenta inventario", async () => {
+      const orderRow = { id: 77, total: "50" };
+      const platillosRows = [
+        { id: 10, precio: "15.5", disponible: true },
+        { id: 20, precio: "40", disponible: true },
+      ];
+      const ingredientesRows = [
+        {
+          platillo_id: 10,
+          producto_id: 100,
+          cantidad: "2",
+          producto: [{ id: 100, nombre: "Camarón" }],
+        },
+        {
+          platillo_id: 20,
+          producto_id: 200,
+          cantidad: "1",
+          producto: [{ id: 200, nombre: "Pulpo" }],
+        },
+      ];
+      const inventarioRows = [
+        { id: 1, producto_id: 100, cantidad_disponible: "10" },
+        { id: 2, producto_id: 200, cantidad_disponible: "5" },
+      ];
+      const finalOrderRow = {
+        id: 77,
+        mesa_id: 3,
+        mesero_id: 7,
+        fecha: "2025-01-05T12:00:00Z",
+        estado: "Pendiente",
+        total: "121",
+        mesa: [{ id: 3, numero: "B4" }],
+        mesero: [{ id: 7, nombre: "Ana" }],
+        detalle_orden: [
+          {
+            id: 900,
+            platillo_id: 10,
+            cantidad: "5",
+            precio_unit: "15.5",
+            subtotal: "77.5",
+            platillo: [{ id: 10, nombre: "Ceviche" }],
+          },
+          {
+            id: 901,
+            platillo_id: 20,
+            cantidad: "2",
+            precio_unit: "40",
+            subtotal: "80",
+            platillo: [{ id: 20, nombre: "Pulpo" }],
+          },
+        ],
+        pagos: [],
+      };
+
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+      const platillosBuilder = createPlatillosBuilder({
+        data: platillosRows,
+        error: null,
+      });
+      const ingredientesBuilder = createIngredientsBuilder({
+        data: ingredientesRows,
+        error: null,
+      });
+      const inventarioBuilder = createInventorySelectBuilder({
+        data: inventarioRows,
+        error: null,
+      });
+      const detailInsertBuilder = createDetailInsertReturningBuilder([
+        { id: 600 },
+        { id: 601 },
+      ]);
+      const totalUpdateBuilder = createOrderTotalUpdateBuilder();
+      const inventoryUpsertBuilder = createInventoryUpsertBuilder();
+      const finalOrderBuilder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      fromMock
+        .mockImplementationOnce(() => orderLookupBuilder)
+        .mockImplementationOnce(() => platillosBuilder)
+        .mockImplementationOnce(() => ingredientesBuilder)
+        .mockImplementationOnce(() => inventarioBuilder)
+        .mockImplementationOnce(() => detailInsertBuilder)
+        .mockImplementationOnce(() => totalUpdateBuilder)
+        .mockImplementationOnce(() => inventoryUpsertBuilder)
+        .mockImplementationOnce(() => finalOrderBuilder);
+
+      const result = await ordersService.addItems(77, {
+        items: [
+          { platillo_id: 10, cantidad: 2 },
+          { platillo_id: 20, cantidad: 1 },
+        ],
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        order: {
+          id: 77,
+          mesaId: 3,
+          mesaNumero: "B4",
+          meseroId: 7,
+          meseroNombre: "Ana",
+          estado: "Pendiente",
+          fecha: "2025-01-05T12:00:00Z",
+          total: 121,
+          totalPagado: 0,
+          saldoPendiente: 121,
+          items: [
+            {
+              id: 900,
+              platilloId: 10,
+              platilloNombre: "Ceviche",
+              cantidad: 5,
+              precioUnit: 15.5,
+              subtotal: 77.5,
+            },
+            {
+              id: 901,
+              platilloId: 20,
+              platilloNombre: "Pulpo",
+              cantidad: 2,
+              precioUnit: 40,
+              subtotal: 80,
+            },
+          ],
+          pagos: [],
+        },
+      });
+
+      expect(detailInsertBuilder.payloads[0]).toEqual([
+        {
+          orden_id: 77,
+          platillo_id: 10,
+          cantidad: 2,
+          precio_unit: 15.5,
+          subtotal: 31,
+        },
+        {
+          orden_id: 77,
+          platillo_id: 20,
+          cantidad: 1,
+          precio_unit: 40,
+          subtotal: 40,
+        },
+      ]);
+
+      expect(totalUpdateBuilder.payloads[0]).toEqual({ total: 121 });
+
+      expect(inventoryUpsertBuilder.payloads[0]).toEqual([
+        { producto_id: 100, cantidad_disponible: 6 },
+        { producto_id: 200, cantidad_disponible: 4 },
+      ]);
+    });
+
+    it("rechaza cuando la orden no existe", async () => {
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: null,
+        error: null,
+      });
+      fromMock.mockImplementationOnce(() => orderLookupBuilder);
+
+      const result = await ordersService.addItems(999, {
+        items: [{ platillo_id: 3, cantidad: 1 }],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "Orden no encontrada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
     });
   });
 
