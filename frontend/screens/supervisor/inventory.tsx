@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import type { InventoryCategory, InventoryProduct, User } from "../types";
 import Separator from "../../src/components/separator";
 import logo from "../../assets/logo.png";
@@ -7,8 +7,9 @@ import Button from "../../src/components/ui/button";
 import Input from "../../src/components/ui/input";
 import SearchBar from "../../src/components/ui/searchBar";
 import { Pencil, Trash2 } from "lucide-react";
+import { Table, type Column } from "../../src/components/ui/table";
 
-type SupervisorHomeProps = {
+type InventoryProps = {
   user: User;
   logout: () => void;
 };
@@ -37,7 +38,6 @@ type CategoriesResponse =
 const initialCreateForm = {
   nombre: "",
   descripcion: "",
-  precio: "",
   unidad: "pza",
   cantidad_inicial: "",
   nivel_minimo: "",
@@ -47,7 +47,6 @@ const initialCreateForm = {
 const initialEditForm = {
   nombre: "",
   descripcion: "",
-  precio: "",
   unidad: "",
   nivel_minimo: "",
   categoria_id: "",
@@ -71,7 +70,7 @@ function getResponseMessage(payload: unknown): string | undefined {
   return undefined;
 }
 
-export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
+export function Inventory({ user, logout }: InventoryProps) {
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -153,7 +152,6 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
       setEditForm({
         nombre: editModalProduct.nombre,
         descripcion: editModalProduct.descripcion ?? "",
-        precio: editModalProduct.precio ? String(editModalProduct.precio) : "",
         unidad: editModalProduct.unidad ?? "",
         nivel_minimo:
           editModalProduct.inventario.nivelMinimo !== null
@@ -189,14 +187,6 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
     const bodyPayload: Record<string, unknown> = { nombre };
     if (createForm.descripcion.trim()) {
       bodyPayload.descripcion = createForm.descripcion.trim();
-    }
-    if (createForm.precio) {
-      const precio = Number(createForm.precio);
-      if (Number.isNaN(precio) || precio < 0) {
-        setCreateError("El precio debe ser mayor o igual a 0");
-        return;
-      }
-      bodyPayload.precio = precio;
     }
     if (createForm.unidad.trim()) {
       bodyPayload.unidad = createForm.unidad.trim();
@@ -346,19 +336,6 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
       payload.descripcion = trimmedDescription;
     }
 
-    if (editForm.precio) {
-      const precio = Number(editForm.precio);
-      if (Number.isNaN(precio) || precio < 0) {
-        setEditError("El precio debe ser mayor o igual a 0");
-        return;
-      }
-      if (precio !== editModalProduct.precio) {
-        payload.precio = precio;
-      }
-    } else if (editModalProduct.precio !== 0) {
-      payload.precio = 0;
-    }
-
     const unidad = editForm.unidad.trim();
     if (!unidad) {
       setEditError("La unidad es obligatoria");
@@ -453,58 +430,105 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
     );
   });
 
+  //Definicion de columnas para la tabla
+  const columns = useMemo<Column<InventoryProduct>[]>(
+    () => [
+      { header: "ID", accessor: "id", width: "6%", cellClassName: "text-xs" },
+      { header: "Nombre", accessor: "nombre" },
+      {
+        header: "Categoría",
+        accessor: "categoriaNombre",
+        render: (v) => v ?? "Sin categoría",
+        width: "12%"
+      },
+      {
+        header: "Descripción",
+        accessor: "descripcion",
+        render: (v) => v ?? "Sin descripción",
+        width:"28%",
+        cellClassName: "truncate"
+      },
+      {
+        header: "Disponibles",
+        accessor: "inventario" as const,
+        render: (_v, row) => `${row.inventario.cantidadDisponible} ${row.unidad}`,
+      },
+      {
+        header: "Nivel mínimo",
+        accessor: "inventario" as const,
+        render: (_v, row) =>
+          row.inventario.nivelMinimo === null
+            ? "-"
+            : `${row.inventario.nivelMinimo} ${row.unidad}`,
+      },
+      {
+        header: "",
+        accessor: "id" as const,
+        width: "5%",
+        cellClassName:"text-center",
+        render: (_v, row) => (
+          <div className="flex items-center gap-2 justify-center">
+            <button
+              onClick={() => openAdjustModal(row, "add")}
+              className="px-2 py-1 rounded bg-[var(--confirmation)] text-[var(--text-buttons)] text-xs"
+            >
+              Agregar
+            </button>
+            <button
+              onClick={() => openAdjustModal(row, "remove")}
+              className="px-2 py-1 rounded bg-[var(--warning)] text-[var(--text-buttons)] text-xs"
+            >
+              Retirar
+            </button>
+            <button
+              onClick={() => openEditModal(row)}
+              title="Editar producto"
+              className="p-1 rounded-full border border-white/20 text-[var(--text-primary)] hover:bg-white/10"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => openDeleteModal(row)}
+              title="Eliminar producto"
+              className="p-1 rounded-full border border-white/20 text-[var(--warning)] hover:bg-white/10"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [openAdjustModal, openEditModal, openDeleteModal],
+  );
+  
+
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
       <div className="m-10">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="Logo" className="w-16 h-16 object-contain" />
-          <div className="flex flex-col">
-            <span className="text-xl manrope-bold">{user.nombre}</span>
-            <span className="text-sm text-[var(--text-secondary)]">Supervisor</span>
-          </div>
+          <span className="text-xl manrope-bold">{user.nombre}</span>
           <div className="ml-auto">
-            <button
-              onClick={logout}
-              className="text-sm underline underline-offset-2 hover:opacity-80"
-            >
-              Cerrar sesión
-            </button>
+            <span className="text-s text-[var(--text-primary)]">Supervisor</span>
           </div>
         </div>
+        <div className="flex items-center justify-center">
+          <span className=" text-3xl manrope-bold">Inventario</span>
+        </div>
+        
         <Separator />
       </div>
 
       <div className="flex-1 px-6 pb-10">
-        <div className="bg-[var(--secondary)] rounded-2xl shadow-lg p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl manrope-bold">Inventario</h2>
-              <p className="text-sm text-[var(--text-secondary)]">
-                Revisa existencias y realiza ajustes rápidos.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => void fetchInventory()}
-                className="px-4 py-2 rounded-lg border border-[var(--text-primary)] text-sm hover:bg-white/10 transition"
-              >
-                Actualizar
-              </button>
-              <Button
-                type="button"
-                className="!w-auto px-6"
-                onClick={() => setCreateModalOpen(true)}
-              >
-                Nuevo producto
-              </Button>
-            </div>
+        <div className="bg-[var(--secondary)] rounded-2xl shadow-lg pt-6 pb-6 space-y-4">
+          <div className="pl-6 pr-6">
+            <SearchBar
+              placeholder="Buscar por nombre o categoría"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
           </div>
 
-          <SearchBar
-            placeholder="Buscar por nombre o categoría"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
 
           {inventoryError && (
             <div className="rounded-md bg-red-100/80 text-red-800 px-4 py-2 text-sm">
@@ -514,92 +538,33 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
 
           {loadingProducts ? (
             <p className="text-sm text-[var(--text-secondary)]">Cargando inventario...</p>
-          ) : filteredProducts.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">
-              {products.length === 0
-                ? "No hay productos registrados todavía."
-                : "No encontramos productos que coincidan con tu búsqueda."}
-            </p>
           ) : (
-            <div className="grid gap-4">
-              {filteredProducts.map((product) => {
-                const nivelMinimo = product.inventario.nivelMinimo ?? 0;
-                const lowStock =
-                  nivelMinimo > 0 &&
-                  product.inventario.cantidadDisponible <= nivelMinimo;
+            <Table<InventoryProduct> columns={columns} data={filteredProducts} />
 
-                return (
-                  <div
-                    key={product.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-white/10 rounded-xl p-4 bg-[var(--secondary-accent)]"
-                  >
-                    <div className="flex-1">
-                      <h3 className="text-lg manrope-bold">{product.nombre}</h3>
-                      {product.categoriaNombre && (
-                        <p className="text-xs uppercase tracking-wide text-[var(--text-secondary)] manrope-bold">
-                          {product.categoriaNombre}
-                        </p>
-                      )}
-                      <p className="text-sm text-[var(--text-secondary)]">
-                        {product.descripcion ?? "Sin descripción"}
-                      </p>
-                      <div className="mt-2 text-sm">
-                        <span className="manrope-bold">
-                          Disponibles: {product.inventario.cantidadDisponible} {product.unidad}
-                        </span>
-                        {lowStock && (
-                          <span className="ml-3 text-[var(--warning)]">
-                            Bajo inventario (mínimo {nivelMinimo})
-                          </span>
-                        )}
-                      </div>
-                      {product.inventario.nivelMinimo !== null && !lowStock && (
-                        <p className="text-xs text-[var(--text-secondary)]">
-                          Nivel mínimo: {nivelMinimo} {product.unidad}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 flex-wrap items-center">
-                      <button
-                        onClick={() => openAdjustModal(product, "add")}
-                        className="px-4 py-2 rounded-lg bg-[var(--confirmation)] text-[var(--text-buttons)] text-sm hover:opacity-90 transition"
-                      >
-                        Agregar
-                      </button>
-                      <button
-                        onClick={() => openAdjustModal(product, "remove")}
-                        className="px-4 py-2 rounded-lg bg-[var(--warning)] text-[var(--text-buttons)] text-sm hover:opacity-90 transition"
-                      >
-                        Retirar
-                      </button>
-                      <button
-                        onClick={() => openEditModal(product)}
-                        title="Editar producto"
-                        className="p-2 rounded-full border border-white/20 text-[var(--text-primary)] hover:bg-white/10 transition"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openDeleteModal(product)}
-                        title="Eliminar producto"
-                        className="p-2 rounded-full border border-white/20 text-[var(--warning)] hover:bg-white/10 transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           )}
+            
         </div>
+          <div className="flex flex-wrap gap-3 items-center justify-center m-8">
+            <Button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+            >
+              Añadir producto
+            </Button>
+          </div>
       </div>
+      <div className="flex justify-end items-center gap-4 mb-5 mr-14">
+        <button className="hover:scale-105 hover:cursor-pointer tansition-transform duration-200" onClick={logout}>
+          Cerrar sesión
+          </button>
+        </div>
 
       <Modal
         isOpen={createModalOpen}
         onClose={resetCreateForm}
         title="Registrar producto"
         width="max-w-3xl"
+        closeOnBackdrop={false}
       >
         <form
           className="flex flex-col gap-4 items-center"
@@ -623,28 +588,15 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
               }))
             }
           />
-          <div className="flex flex-col sm:flex-row gap-4 w-full justify-between">
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Precio"
-              value={createForm.precio}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, precio: e.target.value }))
-              }
-            />
-            <Input
-              placeholder="Unidad (ej. kg, pza)"
-              value={createForm.unidad}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, unidad: e.target.value }))
-              }
-            />
-          </div>
+          <Input
+            placeholder="Unidad (ej. kg, pza)"
+            value={createForm.unidad}
+            onChange={(e) =>
+              setCreateForm((prev) => ({ ...prev, unidad: e.target.value }))
+            }
+          />
           <div className="flex flex-col w-full">
-            <label className="text-sm mb-1 manrope-bold">
-              Categoría
+            <label className="text-sm mb-1 manrope-light">
               <span className="ml-1 text-xs text-[var(--text-secondary)]">
                 (opcional)
               </span>
@@ -725,10 +677,12 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
         onClose={closeEditModal}
         title="Editar producto"
         width="max-w-3xl"
+        closeOnBackdrop={false}
       >
         {editModalProduct && (
           <form className="flex flex-col gap-4" onSubmit={handleEditSubmit}>
-            <Input
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Input
               placeholder="Nombre"
               value={editForm.nombre}
               onChange={(event) =>
@@ -746,33 +700,17 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
                 }))
               }
             />
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Precio"
-                value={editForm.precio}
-                onChange={(event) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    precio: event.target.value,
-                  }))
-                }
-                required
-              />
-              <Input
-                placeholder="Unidad"
-                value={editForm.unidad}
-                onChange={(event) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    unidad: event.target.value,
-                  }))
-                }
-                required
-              />
-            </div>
+            <Input
+              placeholder="Unidad"
+              value={editForm.unidad}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  unidad: event.target.value,
+                }))
+              }
+              required
+            />
             <div className="flex flex-col sm:flex-row gap-4 w-full">
               <select
                 value={editForm.categoria_id}
@@ -816,6 +754,8 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
                 Cancelar
               </Button>
             </div>
+            </div>
+            
           </form>
         )}
       </Modal>
@@ -825,6 +765,7 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
         onClose={closeDeleteModal}
         title="Eliminar producto"
         width="max-w-lg"
+        closeOnBackdrop={false}
       >
         {deleteTarget && (
           <div className="flex flex-col gap-4">
@@ -856,6 +797,7 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
           adjustModal.mode === "add" ? "Agregar inventario" : "Retirar inventario"
         }
         width="max-w-lg"
+        closeOnBackdrop={false}
       >
         {adjustModal.product && (
           <form className="flex flex-col gap-4" onSubmit={handleAdjustSubmit}>
@@ -893,3 +835,4 @@ export function SupervisorHome({ user, logout }: SupervisorHomeProps) {
     </div>
   );
 }
+export default Inventory;

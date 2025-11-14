@@ -7,7 +7,8 @@ type MeseroHomeProps = {
 
 export function MeseroHome({ user, logout }: MeseroHomeProps) {
   return (
-    <div>
+    <div >
+      
       <h1>Mesero: {user.nombre}</h1>
       <button onClick={logout}>Cerrar sesión</button>
     </div>

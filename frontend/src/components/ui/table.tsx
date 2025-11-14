@@ -1,19 +1,22 @@
 import React from "react";
 
-export type Column<T, K extends keyof T = keyof T> = {
+export type Column<T> = {
   header: string;
-  accessor: K;
-  render?: (value: T[K], row: T) => React.ReactNode;
+  accessor: keyof T;
+  render?: (value: unknown, row: T) => React.ReactNode;
+  width?: string;
+  cellClassName?: string;
 };
 
 interface TableProps<T> {
   data: T[];
   columns: Column<T>[];
+  tableClassName?: string;
 }
 
 export function Table<T>({ columns, data }: TableProps<T>) {
   return (
-    <div className="overflow-x-auto bg-[var(--secondary)] text-[var(--text-primary)]">
+    <div className="overflow-x-auto min-h-[50vh] bg-[var(--secondary)] text-[var(--text-primary)]">
       <table className="min-w-full text-left border-collapse">
         <thead className="bg-[var(--secondary-accent)] manrope-regular">
           <tr>

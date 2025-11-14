@@ -308,8 +308,8 @@ export function Usuarios({ onReady }: UsuariosProps = {}) {
   }
 
   return (
-    <div className="bg-[var(--secondary)] pb-10 rounded-lg shadow-md">
-      <div className="p-6 space-y-4">
+    <div className="bg-[var(--secondary)] pb-6 rounded-xl shadow-md flex flex-col h-full overflow-hidden">
+      <div className="p-6 space-y-4 flex-shrink-0">
         {error && (
           <div className="rounded-md bg-red-100 px-3 py-2 text-sm text-[var(--warning)]">
             {error}
@@ -358,8 +358,12 @@ export function Usuarios({ onReady }: UsuariosProps = {}) {
           </div>
         </div>
       </div>
-      <Table<UserRow> columns={columns} data={filteredUsuarios} />
-
+      <div className="flex-1 overflow-y-auto table-scroll-area">
+        <div className="min-w-full  border-t border-gray-200">
+          <Table<UserRow> columns={columns} data={filteredUsuarios} tableClassName="w-full" />
+        </div>
+      </div>
+      
       <Modal isOpen={isModalOpen} onClose={handleModalClose} title="Editar Usuario">
         <form
           className="flex flex-col gap-4 justify-center items-center"

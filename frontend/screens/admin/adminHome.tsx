@@ -101,21 +101,21 @@ export function AdminHome({ user, logout }: AdminHomeProps) {
         </div>
         <Separator/>
       </div>
-      <div className="flex-1 overflow-y-auto px-20">
+      <div className="flex-1 px-20 overflow-hidden">
         <Usuarios onReady={handleUsuariosReady}/>
         
-      <div className="flex justify-center m-10">
+      </div>
+      <div className="flex justify-center m-10 flex-shrink-0">
         <Button onClick={() => setIsModalOpen(true)}>
           Crear Usuario
         </Button>
       </div>
+        <div className="flex justify-end items-center gap-4 mb-5 mr-14 flex-shrink-0">
+          <button className="hover:scale-105 hover:cursor-pointer tansition-transform duration-200" onClick={logout}>Cerrar sesión</button>
+        </div>
 
 
-      </div>
 
-      <div className="flex justify-end items-center gap-4 mb-5 mr-14">
-        <button className="hover:scale-105 hover:cursor-pointer tansition-transform duration-200" onClick={logout}>Cerrar sesión</button>
-      </div>
       
       
       <Modal 

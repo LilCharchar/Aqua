@@ -37,3 +37,19 @@ body {
   color: var(--text-primary);
   transition: background-color 0.5s ease, color 0.5s ease;
 }
+
+.table-scroll-area::-webkit-scrollbar {
+  width: 8px; /* Ancho de la barra vertical */
+}
+
+.table-scroll-area::-webkit-scrollbar-track {
+  background: var(--secondary); /* Fondo de la pista */
+  border-radius: 10px;
+}
+
+.table-scroll-area::-webkit-scrollbar-thumb {
+  background-color: var(--options); /* Color del "pulgar" */
+  border-radius: 10px;
+  border: 2px solid var(--background); /* Margen alrededor del pulgar */
+}
+
