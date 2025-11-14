@@ -1,4 +1,4 @@
-import { PlatillosService } from "../../controllers/platillo/platillos.service";
+import { PlatillosService } from "../../controllers/platillos/platillos.service";
 import { SupabaseService } from "../../src/supabase.service";
 
 type ListResponse = { data: unknown[] | null; error: Error | null };
@@ -80,7 +80,7 @@ describe("PlatillosService", () => {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
     };
     platillosService = new PlatillosService(
-      supabaseService as unknown as SupabaseService
+      supabaseService as unknown as SupabaseService,
     );
   });
 
@@ -108,7 +108,7 @@ describe("PlatillosService", () => {
       ];
 
       fromMock.mockImplementationOnce(() =>
-        createListBuilder({ data: rows, error: null })
+        createListBuilder({ data: rows, error: null }),
       );
 
       const result = await platillosService.listPlatillos();
@@ -140,7 +140,7 @@ describe("PlatillosService", () => {
 
     it("propaga el error de supabase", async () => {
       fromMock.mockImplementationOnce(() =>
-        createListBuilder({ data: null, error: new Error("fail") })
+        createListBuilder({ data: null, error: new Error("fail") }),
       );
 
       const result = await platillosService.listPlatillos();
@@ -214,7 +214,7 @@ describe("PlatillosService", () => {
         error: null,
       });
       const ingredientBuilder = createIngredientInsertBuilder(
-        new Error("fail")
+        new Error("fail"),
       );
       const deleteBuilder = createDeleteBuilder(null);
 

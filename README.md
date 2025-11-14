@@ -128,3 +128,43 @@ Para correr una suite específica (por ejemplo la de `AuthService`):
 cd backend
 npm test -- --runTestsByPath src/auth.service.spec.ts
 ```
+
+También podés correr un archivo puntual dentro de `test/unit`, por ejemplo el set de órdenes:
+
+```bash
+cd backend
+npm test -- --runTestsByPath test/unit/orders.service.spec.ts
+```
+
+## 10. API de órdenes
+
+Los endpoints REST de órdenes expuestos por Nest (ver `backend/controllers/orders`) siguen esta convención:
+
+- `GET /orders?status=Pendiente` → lista órdenes (opcionalmente filtradas por estado válido).
+- `GET /orders/:id` → devuelve una orden con su detalle y pagos.
+- `POST /orders` → crea una orden; payload: `{ mesa_id?, mesero_id?, estado?, items: [{ platillo_id, cantidad }] }`.
+- `PATCH /orders/:id/status` → cambia el estado (`Pendiente`, `En_Proceso`, `Confirmada`, `Pagada`, `Anulada`).
+- `POST /orders/:id/items` → agrega más platillos a una orden existente; payload: `{ items: [{ platillo_id, cantidad }] }`.
+- `POST /orders/:id/payments` → registra un pago (`metodo_pago` = `Efectivo`|`Tarjeta`, `monto`, `cambio?`).
+
+Cada respuesta incluye totales normalizados (`total`, `totalPagado`, `saldoPendiente`) y los ítems con precios unitarios calculados a partir del catálogo de platillos.
+
+> Nota: al crear o actualizar una orden la API revisa los ingredientes de cada platillo, verifica el inventario disponible y descuenta automáticamente las cantidades requeridas. Si algún insumo no existe o no alcanza, la operación se rechaza con un mensaje descriptivo.
+
+## 11. Playground de platillos y órdenes
+
+Hay una vista mínima para pruebas rápidas sin pasar por el flujo de login. Levanta el frontend normalmente y abre:
+
+```
+http://localhost:5173/?view=lab
+```
+
+La pantalla te deja:
+- Visualizar los platillos disponibles.
+- Crear platillos nuevos (incluyendo ingredientes).
+- Crear órdenes especificando mesa, mesero y los ítems.
+- Agregar platillos a órdenes existentes.
+- Consultar una orden por ID para revisar totales e ítems.
+- Registrar pagos y actualizar el estado de la orden, viendo el historial resultante.
+
+Por defecto usa `http://localhost:5000/api` como base; si necesitás apuntar a otra URL, define `VITE_API_URL` en el entorno del frontend antes de ejecutar `npm run dev`.
