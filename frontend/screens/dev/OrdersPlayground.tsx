@@ -40,9 +40,7 @@ interface OrderDetails {
   items: OrderItem[];
 }
 
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  "http://localhost:5000/api";
+const API_URL = "http://localhost:5000/api";
 
 interface OrderItemInput {
   key: string;
@@ -271,7 +269,6 @@ function OrdersPlayground() {
     orderId: "",
     metodo: "Efectivo",
     monto: "",
-    cambio: "",
   });
   const [paymentResult, setPaymentResult] = useState<string>("");
   const [paymentError, setPaymentError] = useState<string>("");
@@ -462,26 +459,32 @@ function OrdersPlayground() {
       setPaymentError("Ingresa un ID de orden válido");
       return;
     }
-    const monto = Number(paymentForm.monto);
-    if (!Number.isFinite(monto) || monto <= 0) {
-      setPaymentError("El monto debe ser mayor a 0");
-      return;
+
+    // Si es tarjeta, usar el saldo pendiente de la última orden cargada
+    let monto: number;
+    if (paymentForm.metodo === "Tarjeta") {
+      if (!lastOrder || lastOrder.id !== orderId) {
+        setPaymentError("Primero consulta la orden para pagar con tarjeta");
+        return;
+      }
+      if (lastOrder.saldoPendiente <= 0) {
+        setPaymentError("La orden no tiene saldo pendiente");
+        return;
+      }
+      monto = lastOrder.saldoPendiente;
+    } else {
+      // Para efectivo, usar el monto ingresado
+      monto = Number(paymentForm.monto);
+      if (!Number.isFinite(monto) || monto <= 0) {
+        setPaymentError("El monto debe ser mayor a 0");
+        return;
+      }
     }
-    const cambio = paymentForm.cambio
-      ? Number(paymentForm.cambio)
-      : undefined;
-    if (
-      cambio !== undefined &&
-      (!Number.isFinite(cambio) || Number(cambio) < 0)
-    ) {
-      setPaymentError("El cambio debe ser un número positivo");
-      return;
-    }
+
     try {
       const data = await requestJson(`/orders/${orderId}/payments`, {
         metodo_pago: paymentForm.metodo,
         monto,
-        cambio,
       });
       setPaymentResult(JSON.stringify(data, null, 2));
       if (data?.order) setLastOrder(data.order as OrderDetails);
@@ -897,31 +900,29 @@ function OrdersPlayground() {
               </select>
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Monto
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100"
-                value={paymentForm.monto}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, monto: e.target.value }))
-                }
-              />
-            </label>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Cambio (opcional)
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100"
-                value={paymentForm.cambio}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, cambio: e.target.value }))
-                }
-              />
-            </label>
+          <label className="text-xs uppercase tracking-wide text-slate-400 block">
+            Monto {paymentForm.metodo === "Tarjeta" && "(automático)"}
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              disabled={paymentForm.metodo === "Tarjeta"}
+              className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              value={paymentForm.metodo === "Tarjeta" && lastOrder && Number(paymentForm.orderId) === lastOrder.id ? lastOrder.saldoPendiente.toFixed(2) : paymentForm.monto}
+              onChange={(e) =>
+                setPaymentForm((prev) => ({ ...prev, monto: e.target.value }))
+              }
+              placeholder={paymentForm.metodo === "Tarjeta" ? "Se usará el saldo pendiente" : ""}
+            />
+          </label>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+            <p className="text-xs text-blue-200">
+              {paymentForm.metodo === "Efectivo" ? (
+                <>💡 <strong>Cambio automático:</strong> Si pagas con un monto mayor al saldo pendiente, el cambio se calculará automáticamente.</>
+              ) : (
+                <>💳 <strong>Pago con tarjeta:</strong> El monto se toma automáticamente del saldo pendiente de la orden. Asegúrate de consultar la orden primero.</>
+              )}
+            </p>
           </div>
           <button
             type="button"

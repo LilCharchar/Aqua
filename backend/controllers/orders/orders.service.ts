@@ -39,12 +39,12 @@ interface DetalleOrdenRow {
   precio_unit: string | number | null;
   subtotal: string | number | null;
   platillo?:
-    | {
-        id: number;
-        nombre: string;
-      }
-    | { id: number; nombre: string }[]
-    | null;
+  | {
+    id: number;
+    nombre: string;
+  }
+  | { id: number; nombre: string }[]
+  | null;
 }
 
 interface PagoRow {
@@ -158,7 +158,7 @@ export type OrderSingleResponse =
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService) { }
 
   private readonly orderSelect = `
     id,
@@ -467,30 +467,40 @@ export class OrdersService {
       return { ok: false, message: "El monto del pago debe ser mayor a 0" };
     }
 
-    let cambio: number | null = null;
-    if (dto.cambio !== undefined && dto.cambio !== null) {
-      const parsed = Number(dto.cambio);
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        return {
-          ok: false,
-          message: "El cambio debe ser un número positivo",
-        };
-      }
-      cambio = this.toCurrency(parsed);
-    }
-
     const supabase = this.supabaseService.getClient();
 
-    const { data: existing, error: findError } = await supabase
-      .from("ordenes")
-      .select("id")
-      .eq("id", orderId)
-      .maybeSingle();
-
-    if (findError || !existing) {
+    // Obtener orden completa con estado, total y pagos
+    const orderResult = await this.getOrderById(orderId);
+    if (!orderResult.ok) {
       return { ok: false, message: "Orden no encontrada" };
     }
 
+    const order = orderResult.order;
+
+    // Validar que la orden pueda recibir pagos
+    if (order.estado === "Pagada") {
+      return { ok: false, message: "La orden ya está pagada" };
+    }
+    if (order.estado === "Anulada") {
+      return {
+        ok: false,
+        message: "No se pueden registrar pagos en una orden anulada",
+      };
+    }
+
+    // Calcular saldo pendiente
+    const saldoPendiente = this.toCurrency(order.total - order.totalPagado);
+    if (saldoPendiente <= 0) {
+      return { ok: false, message: "La orden ya está completamente pagada" };
+    }
+
+    // Calcular cambio automáticamente para pagos en efectivo
+    let cambio: number | null = null;
+    if (metodoPago === "Efectivo" && monto > saldoPendiente) {
+      cambio = this.toCurrency(monto - saldoPendiente);
+    }
+
+    // Insertar pago
     const { error } = await supabase.from("pagos").insert([
       {
         orden_id: orderId,
@@ -502,6 +512,12 @@ export class OrdersService {
 
     if (error) {
       return { ok: false, message: "No se pudo registrar el pago" };
+    }
+
+    // Verificar si la orden debe marcarse como pagada
+    const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);
+    if (nuevoTotalPagado >= order.total) {
+      await supabase.from("ordenes").update({ estado: "Pagada" }).eq("id", orderId);
     }
 
     return this.getOrderById(orderId);
