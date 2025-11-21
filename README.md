@@ -1,69 +1,199 @@
 # Aqua POS
 
-Aqua es un sistema POS (Point of Sale) para un restaurante de comida marina.
+Sistema POS (Point of Sale) moderno para un restaurante de comida marina. Aqua es una aplicación full-stack que permite gestionar órdenes, inventario, platillos y usuarios de manera eficiente.
 
-El sistema está dividido en dos partes:
-- `backend/`  → API en NestJS (TypeScript). Maneja lógica de negocio, ventas, comunicación con base de datos (Supabase).
-- `frontend/` → Interfaz en React + Vite (TypeScript). Punto de venta visual para el personal del restaurante.
+## 📋 Descripción
 
-## 1. Requisitos
+El sistema está dividido en dos partes principales:
+
+- **`backend/`** → API RESTful en NestJS (TypeScript)  
+  Maneja la lógica de negocio, autenticación, órdenes, platillos, inventario y comunicación con la base de datos (Supabase).
+
+- **`frontend/`** → Interfaz moderna en React + Vite (TypeScript)  
+  Punto de venta visual para el personal del restaurante con pantallas específicas por rol.
+
+## 🚀 Características Principales
+
+### Sistema de Órdenes
+- Creación y gestión de órdenes con estados (`Pendiente`, `En_Proceso`, `Confirmada`, `Pagada`, `Anulada`)
+- Agregado dinámico de platillos a órdenes existentes
+- Cálculo automático de totales, subtotales y saldos pendientes
+- Registro de pagos con múltiples métodos (Efectivo, Tarjeta)
+- **Cálculo automático de cambio** para pagos en efectivo
+- **Actualización automática a estado "Pagada"** cuando se recibe el pago completo
+- **Prevención de pagos** en órdenes ya pagadas
+- Validación automática de inventario al crear/modificar órdenes
+
+### Gestión de Platillos
+- CRUD completo de platillos
+- Gestión de ingredientes por platillo
+- Validación de disponibilidad de ingredientes
+- Descuento automático de inventario al confirmar órdenes
+
+### Control de Inventario
+- Gestión de productos y categorías
+- Seguimiento de cantidades disponibles y niveles mínimos
+- Actualización automática al procesar órdenes
+
+### Autenticación y Usuarios
+- Login seguro con contraseñas encriptadas (bcrypt)
+- Gestión de usuarios por roles (Admin, Mesero, Supervisor)
+- Activación/desactivación de usuarios
+
+## 🛠️ Tecnologías
+
+### Backend
+- **NestJS** - Framework de Node.js
+- **TypeScript** - Lenguaje de programación
+- **Supabase** - Base de datos PostgreSQL y backend-as-a-service
+- **bcrypt** - Encriptación de contraseñas
+- **class-validator** - Validación de DTOs
+- **Jest** - Testing (unit y e2e)
+- **Winston** - Logging
+
+### Frontend
+- **React 19** - Biblioteca de UI
+- **Vite** - Build tool y dev server
+- **TypeScript** - Lenguaje de programación
+- **TailwindCSS 4** - Framework de estilos
+- **React Router DOM** - Enrutamiento
+- **Lucide React** - Iconos
+
+## 📁 Estructura del Proyecto
+
+```
+Aqua/
+├── backend/                 # API NestJS
+│   ├── src/                # Código fuente principal
+│   │   ├── app.module.ts   # Módulo raíz
+│   │   ├── main.ts         # Entry point
+│   │   └── supabase.service.ts
+│   ├── controllers/        # Módulos de negocio
+│   │   ├── auth/          # Autenticación y usuarios
+│   │   ├── orders/        # Gestión de órdenes
+│   │   ├── platillos/     # Gestión de platillos
+│   │   └── inventory/     # Gestión de inventario
+│   ├── test/              # Tests
+│   │   ├── unit/          # Tests unitarios
+│   │   └── app.e2e-spec.ts
+│   └── types/             # Type definitions
+│
+├── frontend/              # App React
+│   ├── src/              # Código fuente
+│   │   ├── components/   # Componentes reutilizables
+│   │   ├── App.tsx       # Componente raíz
+│   │   └── main.tsx      # Entry point
+│   ├── screens/          # Pantallas por rol
+│   │   ├── admin/        # Vista de administrador
+│   │   ├── mesero/       # Vista de mesero
+│   │   ├── supervisor/   # Vista de supervisor
+│   │   └── dev/          # Playground de desarrollo
+│   └── assets/           # Recursos estáticos
+│
+└── package.json          # Script para levantar ambos proyectos
+```
+
+## 📦 Requisitos
 
 - Node.js 18 o superior
 - npm
-- Acceso al archivo `.env` del backend (se comparte por interno)
+- Acceso al archivo `.env` del backend (se comparte internamente)
 
-Clonar el repositorio y trabajar desde la carpeta raíz del proyecto.
+## 🔧 Instalación
 
-## 2. Instalación de dependencias
+### 1. Clonar el repositorio
 
-Instalar dependencias del backend:
+```bash
+git clone <repo-url>
+cd Aqua
+```
+
+### 2. Instalar dependencias del backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Instalar dependencias del frontend:
+### 3. Instalar dependencias del frontend
+
 ```bash
 cd ../frontend
 npm install
 ```
 
-## 3. ENV
+### 4. Configurar variables de entorno
 
-En el backend hay un archivo llamado .env.example que sirve como ejemplo para poner el url y las keys del supabase
+Crear un archivo `.env` en la carpeta `backend/` basado en `.env.example`:
 
-## 4. Levantar proyecto
+```env
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_KEY=tu-key-aqui
+```
 
-Para levantar el proyecto desde la carpeta principal ejecutar el siguiente comando:
+## 🚦 Ejecución
+
+### Levantar todo el proyecto (Backend + Frontend)
+
+Desde la carpeta raíz:
+
 ```bash
 npm run dev
 ```
 
-## 6. Flujo de desarrollo local
+Esto iniciará:
+- Backend en `http://localhost:5000`
+- Frontend en `http://localhost:5173`
 
-Crear backend/.env con las claves reales.
+### Levantar solo el backend
 
-npm run dev en la carpeta raíz
+```bash
+cd backend
+npm run start:dev
+```
 
-Abrir el navegador en http://localhost:5173.
+### Levantar solo el frontend
 
-Probar que el frontend puede consultar la API sin error de CORS.
+```bash
+cd frontend
+npm run dev
+```
 
-## 7. Probar endpoints con `curl`
+## 🧪 Testing
 
-Con el proyecto levantado (`npm run dev` en la raíz) la API queda disponible en `http://localhost:5000/api`.
+Ejecutar todos los tests del backend:
 
-- **Login**
+```bash
+cd backend
+npm test
+```
 
+Ejecutar tests con coverage:
+
+```bash
+cd backend
+npm run test:cov
+```
+
+Ejecutar suite específica:
+
+```bash
+cd backend
+npm test -- --runTestsByPath test/unit/orders.service.spec.ts
+```
+
+## 📡 API Endpoints
+
+### Autenticación (`/api/auth`)
+
+**Login**
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"correo":"usuario@aqua.local","contraseña":"123456"}'
 ```
 
-- **Registro**
-
+**Registro**
 ```bash
 curl -X POST http://localhost:5000/api/auth/register \
   -H "Content-Type: application/json" \
@@ -76,95 +206,204 @@ curl -X POST http://localhost:5000/api/auth/register \
   }'
 ```
 
-- **Listar usuarios**
-
+**Listar usuarios**
 ```bash
 curl http://localhost:5000/api/auth/users
 ```
 
-- **Actualizar usuario**
-
+**Actualizar usuario**
 ```bash
 curl -X PATCH http://localhost:5000/api/auth/USER_ID \
   -H "Content-Type: application/json" \
-  -d '{
-    "nombre": "Nombre Editado",
-    "rol_id": 2,
-    "activo": true
-  }'
+  -d '{"nombre": "Nombre Editado", "rol_id": 2, "activo": true}'
 ```
 
-- **Desactivar usuario**
-
+**Desactivar/Restaurar usuario**
 ```bash
 curl -X DELETE http://localhost:5000/api/auth/USER_ID
-```
-
-- **Restaurar usuario**
-
-```bash
 curl -X PATCH http://localhost:5000/api/auth/USER_ID/restore
 ```
 
-Cada comando devuelve un objeto JSON con la propiedad `ok`. Si `ok` es `false`, revisa el campo `message` para conocer el error devuelto por la API.
+### Órdenes (`/api/orders`)
 
-## 8. Notas de seguridad
-
-- Las contraseñas se almacenan con `bcrypt` (coste 10) al registrarse.
-- Si tenías usuarios creados antes de este cambio (contraseña en texto plano), vuelve a registrarlos o actualiza su contraseña para que se guarde hasheada.
-
-## 9. Ejecutar tests
-
-Los tests del backend se ejecutan desde la carpeta `backend/` usando Jest:
-
+**Listar órdenes**
 ```bash
-cd backend
-npm test
+curl http://localhost:5000/api/orders
+curl http://localhost:5000/api/orders?status=Pendiente
 ```
 
-Para correr una suite específica (por ejemplo la de `AuthService`):
-
+**Obtener orden por ID**
 ```bash
-cd backend
-npm test -- --runTestsByPath src/auth.service.spec.ts
+curl http://localhost:5000/api/orders/1
 ```
 
-También podés correr un archivo puntual dentro de `test/unit`, por ejemplo el set de órdenes:
-
+**Crear orden**
 ```bash
-cd backend
-npm test -- --runTestsByPath test/unit/orders.service.spec.ts
+curl -X POST http://localhost:5000/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mesa_id": 1,
+    "mesero_id": 1,
+    "items": [
+      {"platillo_id": 1, "cantidad": 2},
+      {"platillo_id": 2, "cantidad": 1}
+    ]
+  }'
 ```
 
-## 10. API de órdenes
-
-Los endpoints REST de órdenes expuestos por Nest (ver `backend/controllers/orders`) siguen esta convención:
-
-- `GET /orders?status=Pendiente` → lista órdenes (opcionalmente filtradas por estado válido).
-- `GET /orders/:id` → devuelve una orden con su detalle y pagos.
-- `POST /orders` → crea una orden; payload: `{ mesa_id?, mesero_id?, estado?, items: [{ platillo_id, cantidad }] }`.
-- `PATCH /orders/:id/status` → cambia el estado (`Pendiente`, `En_Proceso`, `Confirmada`, `Pagada`, `Anulada`).
-- `POST /orders/:id/items` → agrega más platillos a una orden existente; payload: `{ items: [{ platillo_id, cantidad }] }`.
-- `POST /orders/:id/payments` → registra un pago (`metodo_pago` = `Efectivo`|`Tarjeta`, `monto`, `cambio?`).
-
-Cada respuesta incluye totales normalizados (`total`, `totalPagado`, `saldoPendiente`) y los ítems con precios unitarios calculados a partir del catálogo de platillos.
-
-> Nota: al crear o actualizar una orden la API revisa los ingredientes de cada platillo, verifica el inventario disponible y descuenta automáticamente las cantidades requeridas. Si algún insumo no existe o no alcanza, la operación se rechaza con un mensaje descriptivo.
-
-## 11. Playground de platillos y órdenes
-
-Hay una vista mínima para pruebas rápidas sin pasar por el flujo de login. Levanta el frontend normalmente y abre:
-
-```
-http://localhost:5173/?view=lab
+**Actualizar estado de orden**
+```bash
+curl -X PATCH http://localhost:5000/api/orders/1/status \
+  -H "Content-Type: application/json" \
+  -d '{"estado": "En_Proceso"}'
 ```
 
-La pantalla te deja:
-- Visualizar los platillos disponibles.
-- Crear platillos nuevos (incluyendo ingredientes).
-- Crear órdenes especificando mesa, mesero y los ítems.
-- Agregar platillos a órdenes existentes.
-- Consultar una orden por ID para revisar totales e ítems.
-- Registrar pagos y actualizar el estado de la orden, viendo el historial resultante.
+**Agregar items a orden**
+```bash
+curl -X POST http://localhost:5000/api/orders/1/items \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {"platillo_id": 3, "cantidad": 1}
+    ]
+  }'
+```
 
-Por defecto usa `http://localhost:5000/api` como base; si necesitás apuntar a otra URL, define `VITE_API_URL` en el entorno del frontend antes de ejecutar `npm run dev`.
+**Registrar pago**
+```bash
+# Pago con tarjeta
+curl -X POST http://localhost:5000/api/orders/1/payments \
+  -H "Content-Type: application/json" \
+  -d '{"metodo_pago": "Tarjeta", "monto": 150.00}'
+
+# Pago en efectivo (cambio calculado automáticamente)
+curl -X POST http://localhost:5000/api/orders/1/payments \
+  -H "Content-Type: application/json" \
+  -d '{"metodo_pago": "Efectivo", "monto": 200.00}'
+```
+
+### Platillos (`/api/platillos`)
+
+**Listar platillos**
+```bash
+curl http://localhost:5000/api/platillos
+```
+
+**Obtener platillo por ID**
+```bash
+curl http://localhost:5000/api/platillos/1
+```
+
+**Crear platillo**
+```bash
+curl -X POST http://localhost:5000/api/platillos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Ceviche de Camarón",
+    "descripcion": "Camarones frescos marinados en limón",
+    "precio": 120.00,
+    "disponible": true,
+    "supervisor_id": 1,
+    "ingredientes": [
+      {"producto_id": 1, "cantidad": 200},
+      {"producto_id": 2, "cantidad": 3}
+    ]
+  }'
+```
+
+**Actualizar platillo**
+```bash
+curl -X PATCH http://localhost:5000/api/platillos/1 \
+  -H "Content-Type: application/json" \
+  -d '{"precio": 130.00, "disponible": true}'
+```
+
+**Eliminar platillo**
+```bash
+curl -X DELETE http://localhost:5000/api/platillos/1
+```
+
+### Inventario (`/api/inventory`)
+
+Similar estructura CRUD para gestión de productos de inventario.
+
+## 🎯 Características del Sistema de Pagos
+
+El sistema de pagos incluye lógica automática avanzada:
+
+1. **Cálculo de cambio**: Al registrar un pago en efectivo, el sistema calcula automáticamente el cambio basado en el saldo pendiente.
+
+2. **Actualización automática de estado**: Cuando el total pagado alcanza o excede el total de la orden, el sistema actualiza automáticamente el estado a "Pagada".
+
+3. **Prevención de sobrepagos**: Una vez que la orden está en estado "Pagada", no se permiten más pagos.
+
+4. **Historial de pagos**: Cada orden mantiene un registro completo de todos los pagos realizados.
+
+## 🗂️ Pantallas por Rol
+
+El frontend organiza las vistas según el rol del usuario:
+
+### Admin (`/screens/admin`)
+- Gestión completa de usuarios
+- Configuración del sistema
+
+### Mesero (`/screens/mesero`)
+- Vista simplificada (en desarrollo)
+- Toma de órdenes
+
+### Supervisor (`/screens/supervisor`)
+- Dashboard con KPIs
+- Gestión de órdenes
+- Gestión de platillos
+- Control de inventario
+- Analytics con Metabase
+
+### Dev Playground (`/screens/dev`)
+- `OrdersPlayground`: Herramienta de testing para órdenes y pagos
+- Accesible en: `http://localhost:5173/?view=lab`
+
+## 🔐 Seguridad
+
+- Contraseñas hasheadas con bcrypt (coste 10)
+- Validación de DTOs con class-validator
+- Variables de entorno para información sensible
+- Gestión de usuarios activos/inactivos
+
+## 🌊 Base de Datos (Supabase)
+
+El proyecto utiliza las siguientes tablas principales:
+
+- `usuarios` - Usuarios del sistema
+- `roles` - Roles de usuario
+- `ordenes` - Órdenes de venta
+- `detalle_orden` - Items de cada orden
+- `pagos` - Registro de pagos
+- `platillos` - Catálogo de platillos
+- `platillo_ingredientes` - Ingredientes por platillo
+- `productos` - Productos de inventario
+- `categorias` - Categorías de productos
+- `inventario` - Stock de productos
+- `mesas` - Mesas del restaurante
+
+## 🐛 Validaciones y Reglas de Negocio
+
+- **Inventario**: Al crear/modificar órdenes, se valida disponibilidad de ingredientes
+- **Estados**: Flujo de estados validado (`Pendiente` → `En_Proceso` → `Confirmada` → `Pagada`)
+- **Pagos**: Solo se permiten pagos en órdenes no pagadas
+- **Usuarios**: Correos únicos, contraseñas hasheadas obligatorias en nuevos registros
+
+## 📝 Notas Adicionales
+
+- El proyecto usa `concurrently` para levantar backend y frontend simultáneamente
+- La API corre en el puerto 5000, el frontend en el 5173
+- CORS está habilitado para desarrollo local
+- Los tests usan mocks de Supabase para no afectar la base de datos real
+
+## 📚 Documentación Adicional
+
+- [Backend README](./backend/README.md) - Documentación específica del backend
+- [Frontend README](./frontend/README.md) - Documentación específica del frontend
+
+---
+
+**Desarrollado para Aqua Restaurant** 🐟
