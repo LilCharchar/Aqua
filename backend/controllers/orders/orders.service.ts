@@ -261,6 +261,42 @@ export class OrdersService {
 
     const supabase = this.supabaseService.getClient();
 
+    // Validar que la mesa existe y está activa
+    if (mesaId) {
+      const { data: mesaData, error: mesaError } = await supabase
+        .from("mesas")
+        .select("id, activa")
+        .eq("id", mesaId)
+        .maybeSingle();
+
+      if (mesaError || !mesaData) {
+        return { ok: false, message: "Mesa no encontrada" };
+      }
+
+      const mesa = mesaData as { id: number; activa: boolean };
+      if (!mesa.activa) {
+        return { ok: false, message: "La mesa no está activa" };
+      }
+    }
+
+    // Validar que el mesero existe y está activo
+    if (meseroId) {
+      const { data: meseroData, error: meseroError } = await supabase
+        .from("usuarios")
+        .select("id, activo")
+        .eq("id", meseroId)
+        .maybeSingle();
+
+      if (meseroError || !meseroData) {
+        return { ok: false, message: "Mesero no encontrado" };
+      }
+
+      const mesero = meseroData as { id: number; activo: boolean };
+      if (!mesero.activo) {
+        return { ok: false, message: "El mesero no está activo" };
+      }
+    }
+
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
       supabase,
@@ -330,6 +366,14 @@ export class OrdersService {
       }
     }
 
+    // Marcar mesa como ocupada (no disponible)
+    if (mesaId) {
+      await supabase
+        .from("mesas")
+        .update({ activa: false })
+        .eq("id", mesaId);
+    }
+
     return this.getOrderById(orderId);
   }
 
@@ -346,7 +390,7 @@ export class OrdersService {
 
     const { data: orderData, error: orderError } = await supabase
       .from("ordenes")
-      .select("id, total")
+      .select("id, total, estado")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -354,7 +398,19 @@ export class OrdersService {
       return { ok: false, message: "Orden no encontrada" };
     }
 
-    const orderRow = orderData as { id: number; total: string | number | null };
+    const orderRow = orderData as {
+      id: number;
+      total: string | number | null;
+      estado: string;
+    };
+
+    // Validar que la orden no esté pagada o anulada
+    if (orderRow.estado === "Pagada") {
+      return { ok: false, message: "No se pueden agregar items a una orden pagada" };
+    }
+    if (orderRow.estado === "Anulada") {
+      return { ok: false, message: "No se pueden agregar items a una orden anulada" };
+    }
 
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
@@ -518,6 +574,14 @@ export class OrdersService {
     const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);
     if (nuevoTotalPagado >= order.total) {
       await supabase.from("ordenes").update({ estado: "Pagada" }).eq("id", orderId);
+
+      // Liberar mesa (marcarla como disponible)
+      if (order.mesaId) {
+        await supabase
+          .from("mesas")
+          .update({ activa: true })
+          .eq("id", order.mesaId);
+      }
     }
 
     return this.getOrderById(orderId);
