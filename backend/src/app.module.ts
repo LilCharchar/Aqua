@@ -4,10 +4,11 @@ import { AuthModule } from "controllers/auth/auth.module";
 import { InventoryModule } from "controllers/inventory/inventory.module";
 import { PlatillosModule } from "controllers/platillos/platillos.module";
 import { OrdersModule } from "controllers/orders/orders.module";
+import { MesasModule } from "controllers/mesas/mesas.module";
 
 @Module({
-  imports: [AuthModule, InventoryModule, PlatillosModule, OrdersModule],
+  imports: [AuthModule, InventoryModule, PlatillosModule, OrdersModule, MesasModule],
   controllers: [],
   providers: [SupabaseService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -1008,4 +1008,54 @@ describe("OrdersService", () => {
       expect(fromMock).toHaveBeenCalledTimes(3); // 2 getOrderById + 1 insert
     });
   });
+
+  describe("addItems - validaciones de estado", () => {
+    it("rechaza agregar items a orden pagada", async () => {
+      const orderRow = {
+        id: 70,
+        estado: "Pagada",
+        total: "100",
+      };
+
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+      fromMock.mockImplementationOnce(() => orderLookupBuilder);
+
+      const result = await ordersService.addItems(70, {
+        items: [{ platillo_id: 1, cantidad: 1 }],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pueden agregar items a una orden pagada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rechaza agregar items a orden anulada", async () => {
+      const orderRow = {
+        id: 71,
+        estado: "Anulada",
+        total: "100",
+      };
+
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+      fromMock.mockImplementationOnce(() => orderLookupBuilder);
+
+      const result = await ordersService.addItems(71, {
+        items: [{ platillo_id: 1, cantidad: 1 }],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pueden agregar items a una orden anulada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });
