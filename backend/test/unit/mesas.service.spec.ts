@@ -4,16 +4,20 @@ import { SupabaseService } from "../../src/supabase.service";
 type ListResponse = { data: unknown[] | null; error: Error | null };
 
 function createMesasBuilderWithFilter(response: ListResponse) {
-    const mockQuery = jest.fn().mockResolvedValue(response);
-    const eq = jest.fn().mockReturnValue(mockQuery);
+    const thenable = {
+        then: (resolve: any) => resolve(response),
+    };
+    const eq = jest.fn().mockReturnValue(thenable);
     const order = jest.fn().mockReturnValue({ eq });
     const select = jest.fn().mockReturnValue({ order });
     return { select, order, eq };
 }
 
 function createMesasBuilderWithoutFilter(response: ListResponse) {
-    const mockQuery = jest.fn().mockResolvedValue(response);
-    const order = jest.fn().mockReturnValue(mockQuery);
+    const thenable = {
+        then: (resolve: any) => resolve(response),
+    };
+    const order = jest.fn().mockReturnValue(thenable);
     const select = jest.fn().mockReturnValue({ order });
     return { select, order };
 }
