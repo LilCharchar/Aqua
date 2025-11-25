@@ -28,6 +28,7 @@ interface PlatilloRow {
   descripcion: string | null;
   precio: string | number;
   disponible: boolean;
+  imagen_url: string | null;
   supervisor_id: number | null;
   creado_en: string | null;
   supervisor?: SupervisorRow | null;
@@ -74,6 +75,7 @@ export interface PlatilloResponse {
   descripcion: string | null;
   precio: number;
   disponible: boolean;
+  imagenUrl: string | null;
   supervisorId: number | null;
   supervisorNombre: string | null;
   creadoEn: string | null;
@@ -102,7 +104,7 @@ type SupervisorValidationResult =
 
 @Injectable()
 export class PlatillosService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService) { }
 
   private readonly platilloSelect = `
     id,
@@ -110,6 +112,7 @@ export class PlatillosService {
     descripcion,
     precio,
     disponible,
+    imagen_url,
     supervisor_id,
     creado_en,
     supervisor:usuarios ( id, nombre ),
@@ -157,6 +160,7 @@ export class PlatillosService {
       descripcion: record.descripcion ?? null,
       precio: this.normalizeDecimal(record.precio) ?? 0,
       disponible: Boolean(record.disponible),
+      imagenUrl: record.imagen_url ?? null,
       supervisorId: record.supervisor_id ?? null,
       supervisorNombre: record.supervisor?.nombre ?? null,
       creadoEn: record.creado_en ?? null,
@@ -290,11 +294,16 @@ export class PlatillosService {
       typeof dto.descripcion === "string" ? dto.descripcion.trim() : "";
     const descripcion = descripcionInput || null;
 
+    const imagenUrlInput =
+      typeof dto.imagen_url === "string" ? dto.imagen_url.trim() : "";
+    const imagen_url = imagenUrlInput || null;
+
     const payload: Record<string, unknown> = {
       nombre,
       descripcion,
       precio,
       disponible,
+      imagen_url,
     };
 
     if (supervisorValidation.value !== undefined) {
@@ -370,6 +379,12 @@ export class PlatillosService {
       const descripcion =
         typeof dto.descripcion === "string" ? dto.descripcion.trim() : "";
       payload.descripcion = descripcion || null;
+    }
+
+    if (dto.imagen_url !== undefined) {
+      const imagenUrl =
+        typeof dto.imagen_url === "string" ? dto.imagen_url.trim() : "";
+      payload.imagen_url = imagenUrl || null;
     }
 
     if (dto.precio !== undefined) {

@@ -9,6 +9,7 @@ export class CreatePlatilloDto {
   precio!: number;
   supervisor_id?: number | null;
   disponible?: boolean;
+  imagen_url?: string;
   ingredientes?: PlatilloIngredientDto[];
 }
 
@@ -18,5 +19,6 @@ export class UpdatePlatilloDto {
   precio?: number;
   supervisor_id?: number | null;
   disponible?: boolean;
+  imagen_url?: string;
   ingredientes?: PlatilloIngredientDto[];
 }
