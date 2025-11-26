@@ -30,6 +30,7 @@ type Dish = {
   supervisorNombre: string | null;
   creadoEn: string | null;
   ingredientes: DishIngredient[];
+  cantidadPreparable: number;
 };
 
 const EMPTY_DISH: Dish = {
@@ -41,7 +42,8 @@ const EMPTY_DISH: Dish = {
   imagenUrl: "",
   supervisorNombre: null, // Se llenará con el nombre del usuario
   creadoEn: null,
-  ingredientes: []
+  ingredientes: [],
+  cantidadPreparable: 0
 };
 
 const API_URL = "/api";
@@ -181,6 +183,8 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
             name={dish.nombre}
             precio={dish.precio}
             disponible={dish.disponible}
+            cantidadPreparable={dish.cantidadPreparable}
+            hasIngredients={dish.ingredientes.length > 0}
             imageURL={dish.imagenUrl ?? undefined}
             onClick={() => openInfoModal(dish.id)}
 
@@ -255,15 +259,6 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
             value={dishToEdit.imagenUrl ?? ""}
             onChange={(e) => setDishToEdit({ ...dishToEdit, imagenUrl: e.target.value })}
           />
-
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={dishToEdit.disponible}
-              onChange={(e) => setDishToEdit({ ...dishToEdit, disponible: e.target.checked })}
-            />
-            Disponible
-          </label>
 
           <Button className="mt-4" onClick={saveChanges}>
             Guardar cambios

@@ -19,6 +19,9 @@ interface PlatilloIngredientRow {
     id: number;
     nombre: string;
     unidad: string | null;
+    inventario?: {
+      cantidad_disponible: number | string;
+    } | null;
   } | null;
 }
 
@@ -80,6 +83,7 @@ export interface PlatilloResponse {
   supervisorNombre: string | null;
   creadoEn: string | null;
   ingredientes: PlatilloIngredientResponse[];
+  cantidadPreparable: number;
 }
 
 export type PlatillosResponse =
@@ -123,7 +127,8 @@ export class PlatillosService {
       producto:productos (
         id,
         nombre,
-        unidad
+        unidad,
+        inventario ( cantidad_disponible )
       )
     )
   `;
@@ -154,17 +159,40 @@ export class PlatillosService {
       ? record.ingredientes.map((ing) => this.mapIngredient(ing))
       : [];
 
+    let maxPreparable = Infinity;
+    let hasIngredients = false;
+
+    if (ingredientes.length > 0) {
+      hasIngredients = true;
+      for (const ing of record.ingredientes || []) {
+        const required = this.normalizeDecimal(ing.cantidad) ?? 0;
+        const available = this.normalizeDecimal(ing.producto?.inventario?.cantidad_disponible) ?? 0;
+
+        if (required > 0) {
+          const possible = Math.floor(available / required);
+          if (possible < maxPreparable) {
+            maxPreparable = possible;
+          }
+        }
+      }
+    } else {
+      maxPreparable = 0;
+    }
+
+    if (maxPreparable === Infinity) maxPreparable = 0;
+
     return {
       id: record.id,
       nombre: record.nombre,
       descripcion: record.descripcion ?? null,
       precio: this.normalizeDecimal(record.precio) ?? 0,
-      disponible: Boolean(record.disponible),
+      disponible: maxPreparable > 0,
       imagenUrl: record.imagen_url ?? null,
       supervisorId: record.supervisor_id ?? null,
       supervisorNombre: record.supervisor?.nombre ?? null,
       creadoEn: record.creado_en ?? null,
       ingredientes,
+      cantidadPreparable: maxPreparable,
     };
   }
 

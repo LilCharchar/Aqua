@@ -1,12 +1,12 @@
 import React from 'react'
 
-
-interface DishCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement>{
+interface DishCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     name: string;
     precio: number;
     imageURL?: string;
     disponible: boolean;
-    
+    cantidadPreparable?: number;
+    hasIngredients?: boolean;
 }
 
 const DishCard: React.FC<DishCardProps> = ({
@@ -14,6 +14,8 @@ const DishCard: React.FC<DishCardProps> = ({
     precio,
     disponible,
     imageURL,
+    cantidadPreparable = 0,
+    hasIngredients = false,
     className = "",
     ...props
 }) => {
@@ -35,23 +37,23 @@ const DishCard: React.FC<DishCardProps> = ({
             active:scale-[1] 
         `
         : `
-            opacity-50 
+            opacity-70 
             transform scale-95
+            cursor-pointer
         `;
 
-    const disponibilidadTexto = disponible 
-        ? `platos disponibles` 
-        : `0 platos disponibles`;
+    const disponibilidadTexto = disponible
+        ? `${cantidadPreparable} platos disponibles`
+        : (cantidadPreparable === 0 && hasIngredients ? `0 platos disponibles` : `Faltan ingredientes`);
 
     return (
         <button
             className={`${baseClasses} ${disabledClasses} ${className}`}
-            disabled={!disponible}
             {...props}
         >
             {/*Imagen plato*/}
             <div className="w-24 h-24 sm:w-32 sm:h-32 -mt-16 mb-2 rounded-full overflow-hidden border-4 border-gray-800 shadow-xl z-10">
-                
+
                 <img src={imageURL}
                     alt={name}
                     className={"object-cover w-full h-full"}
@@ -71,10 +73,10 @@ const DishCard: React.FC<DishCardProps> = ({
                 </p>
 
                 {/* Disponibilidad */}
-                <p className={`text-sm mt-1 font-light mb-1 ${disponible ? 'text-[var(--text-secondary)]'  : 'text-[var(--warning)]'}`}>
+                <p className={`text-sm mt-1 font-light mb-1 ${disponible ? 'text-[var(--text-secondary)]' : 'text-[var(--warning)]'}`}>
                     {disponibilidadTexto}
                 </p>
-            </div>                
+            </div>
         </button>
     )
 }
