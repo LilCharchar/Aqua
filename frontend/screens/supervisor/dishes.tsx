@@ -5,6 +5,7 @@ import Modal from "../../src/components/ui/modal";
 import { useEffect, useState } from "react";
 import SearchBar from "../../src/components/ui/searchBar"
 import Button from "../../src/components/ui/button"
+import { IngredientsEditor, createIngredientRow, type IngredientInput, type ProductOption } from "../../src/components/IngredientsEditor";
 
 type SupervisorDishesProps = {
   user: User;
@@ -30,6 +31,8 @@ type Dish = {
   supervisorNombre: string | null;
   creadoEn: string | null;
   ingredientes: DishIngredient[];
+  cantidadPreparable: number;
+  ingredientInputs?: IngredientInput[];
 };
 
 const EMPTY_DISH: Dish = {
@@ -41,7 +44,9 @@ const EMPTY_DISH: Dish = {
   imagenUrl: "",
   supervisorNombre: null, // Se llenará con el nombre del usuario
   creadoEn: null,
-  ingredientes: []
+  ingredientes: [],
+  cantidadPreparable: 0,
+  ingredientInputs: [createIngredientRow()]
 };
 
 const API_URL = "/api";
@@ -53,6 +58,8 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
   const [dishToEdit, setDishToEdit] = useState<Dish>(EMPTY_DISH);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [products, setProducts] = useState<ProductOption[]>([]);
 
 
   const fetchDishes = async () => {
@@ -67,8 +74,25 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch(API_URL + "/inventory/products");
+      const data = await res.json();
+      if (data.ok) {
+        setProducts(data.products.map((p: any) => ({
+          id: p.id,
+          nombre: p.nombre,
+          unidad: p.unidad
+        })));
+      }
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+    }
+  };
+
   useEffect(() => {
     fetchDishes();
+    fetchProducts();
   }, []);
 
   const openInfoModal = async (id: number) => {
@@ -88,13 +112,29 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
       {
         ...EMPTY_DISH,
         supervisorNombre: user.nombre,
+        ingredientInputs: [createIngredientRow()]
       });
     setIsEditModalOpen(true);
   }
 
   const openEditFromInfoModal = () => {
     if (!selectedDish) return;
-    setDishToEdit(selectedDish);
+
+    // Map existing ingredients to inputs
+    const inputs: IngredientInput[] = selectedDish.ingredientes.map(ing => ({
+      key: `${ing.id}-${Date.now()}`, // Unique key
+      productoId: ing.productoId?.toString() ?? "",
+      cantidad: ing.cantidad.toString()
+    }));
+
+    if (inputs.length === 0) {
+      inputs.push(createIngredientRow());
+    }
+
+    setDishToEdit({
+      ...selectedDish,
+      ingredientInputs: inputs
+    });
     setIsInfoModalOpen(false);
     setIsEditModalOpen(true);
   };
@@ -110,12 +150,21 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
     const method = dishToEdit.id === 0 ? "POST" : "PATCH";
     const url = method === "POST" ? API_URL + "/platillos" : API_URL + `/platillos/${dishToEdit.id}`;
 
+    // Filter and map ingredients
+    const validIngredients = dishToEdit.ingredientInputs
+      ?.filter(i => i.productoId && Number(i.cantidad) > 0)
+      .map(i => ({
+        producto_id: Number(i.productoId),
+        cantidad: Number(i.cantidad)
+      }));
+
     const payload = {
       nombre: dishToEdit.nombre,
       descripcion: dishToEdit.descripcion,
       precio: dishToEdit.precio,
       disponible: dishToEdit.disponible,
       imagen_url: dishToEdit.imagenUrl,
+      ingredientes: validIngredients,
       // Solo se envía el supervisorId/Nombre si es una creación, o si se necesita en el PATCH
       ...(method === "POST" && { supervisorNombre: user.nombre }),
     };
@@ -141,6 +190,27 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
 
   };
 
+  const deleteDish = async () => {
+    if (!dishToEdit.id) return;
+    if (!window.confirm("¿Estás seguro de eliminar este platillo?")) return;
+
+    try {
+      await fetch(API_URL + `/platillos/${dishToEdit.id}`, { method: 'DELETE' });
+      await fetchDishes();
+      setIsEditModalOpen(false);
+      setDishToEdit(EMPTY_DISH);
+      setSelectedDish(null);
+    } catch (error) {
+      console.error("Error al eliminar platillo:", error);
+    }
+  };
+
+  const filteredDishes = dishes.filter(dish => {
+    if (filter === 'available') return dish.cantidadPreparable > 0;
+    if (filter === 'unavailable') return dish.cantidadPreparable === 0;
+    return true;
+  });
+
   if (loading) return <p className="p-6">Cargando platillos...</p>;
 
   return (
@@ -165,7 +235,22 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
             className="w-full sm:w-auto shadow-2xl"
           />
         </div>
-        <div className="flex justify-end w-[20vh]">
+        <div className="flex justify-end w-[50vh] gap-4">
+          <select
+            className="p-2 rounded bg-[var(--background-alt)] text-[var(--text-primary)]"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as any)}
+          >
+            <option value="all">Todos</option>
+            <option value="available">Disponibles</option>
+            <option value="unavailable">No Disponibles</option>
+          </select>
+          <Button
+            className="text-s"
+            onClick={fetchDishes}
+          >
+            Actualizar
+          </Button>
           <Button
             className=" text-s"
             onClick={openCreateModal}
@@ -176,11 +261,14 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-y-22 p-10 place-items-center ">
-        {dishes.map((dish) => (
+        {filteredDishes.map((dish) => (
           <DishCard
+            key={dish.id}
             name={dish.nombre}
             precio={dish.precio}
             disponible={dish.disponible}
+            cantidadPreparable={dish.cantidadPreparable}
+            hasIngredients={dish.ingredientes.length > 0}
             imageURL={dish.imagenUrl ?? undefined}
             onClick={() => openInfoModal(dish.id)}
 
@@ -256,18 +344,25 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
             onChange={(e) => setDishToEdit({ ...dishToEdit, imagenUrl: e.target.value })}
           />
 
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={dishToEdit.disponible}
-              onChange={(e) => setDishToEdit({ ...dishToEdit, disponible: e.target.checked })}
-            />
-            Disponible
-          </label>
+          <IngredientsEditor
+            items={dishToEdit.ingredientInputs ?? []}
+            products={products}
+            onChange={(inputs) => setDishToEdit({ ...dishToEdit, ingredientInputs: inputs })}
+          />
 
-          <Button className="mt-4" onClick={saveChanges}>
-            Guardar cambios
-          </Button>
+          <div className="flex justify-between items-center mt-4">
+            {dishToEdit.id !== 0 && (
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={deleteDish}
+              >
+                Eliminar
+              </Button>
+            )}
+            <Button onClick={saveChanges}>
+              Guardar cambios
+            </Button>
+          </div>
 
         </div>
       </Modal>
