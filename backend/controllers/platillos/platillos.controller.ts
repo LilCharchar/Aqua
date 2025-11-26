@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import { CreatePlatilloDto, UpdatePlatilloDto } from "./platillos.dto";
 import { PlatillosService } from "./platillos.service";
 
@@ -26,7 +34,10 @@ export class PlatillosController {
   }
 
   @Patch(":id")
-  async updatePlatillo(@Param("id") id: string, @Body() dto: UpdatePlatilloDto) {
+  async updatePlatillo(
+    @Param("id") id: string,
+    @Body() dto: UpdatePlatilloDto,
+  ) {
     const platilloId = this.parseNumericId(id);
     if (!platilloId) {
       return { ok: false, message: "ID inválido" };
