@@ -43,7 +43,6 @@ body {
 }
 
 .table-scroll-area::-webkit-scrollbar-track {
-  background: var(--secondary); /* Fondo de la pista */
   border-radius: 10px;
 }
 
@@ -53,3 +52,17 @@ body {
   border: 2px solid var(--background); /* Margen alrededor del pulgar */
 }
 
+.table-scroll-area-darker::-webkit-scrollbar {
+  width: 8px; /* Ancho de la barra vertical */
+}
+
+.table-scroll-area-darker::-webkit-scrollbar-track {
+  background: var(--secondary); /* Fondo de la pista */
+  border-radius: 10px;
+}
+
+.table-scroll-area-darker::-webkit-scrollbar-thumb {
+  background-color: var(--text-primary); /* Color del "pulgar" */
+  border-radius: 10px;
+  border: 2px solid var(--secondary); /* Margen alrededor del pulgar */
+}

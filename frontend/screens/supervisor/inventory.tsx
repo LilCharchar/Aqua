@@ -712,7 +712,7 @@ export function Inventory({ user, logout }: InventoryProps) {
               }
               required
             />
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <div className="flex flex-col sm:flex-row gap-4 w-full items-center pt-2 pb-2">
               <select
                 value={editForm.categoria_id}
                 onChange={(event) =>

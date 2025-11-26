@@ -147,39 +147,44 @@ export class PlatillosService {
   ): PlatilloIngredientResponse {
     return {
       id: row.id,
-      productoId: row.producto?.id ?? row.producto_id ?? null,
-      productoNombre: row.producto?.nombre ?? null,
-      productoUnidad: row.producto?.unidad ?? null,
+      productoId: row.producto?.id ?? row.producto_id,
+      productoNombre: row.producto?.nombre ?? "Producto no disponible",
+      productoUnidad: row.producto?.unidad ?? "",
       cantidad: this.normalizeDecimal(row.cantidad) ?? 0,
     };
   }
 
   private mapPlatillo(record: PlatilloRow): PlatilloResponse {
     const ingredientes = Array.isArray(record.ingredientes)
-      ? record.ingredientes.map((ing) => this.mapIngredient(ing))
+      ? record.ingredientes
+        .map((ing) => this.mapIngredient(ing))
+        .filter((ing) => ing !== null && ing !== undefined)
       : [];
 
     let maxPreparable = Infinity;
     let hasIngredients = false;
 
-    if (ingredientes.length > 0) {
-      hasIngredients = true;
-      for (const ing of record.ingredientes || []) {
-        const required = this.normalizeDecimal(ing.cantidad) ?? 0;
-        const available = this.normalizeDecimal(ing.producto?.inventario?.cantidad_disponible) ?? 0;
+for (const ing of record.ingredientes || []) {
+  const required = this.normalizeDecimal(ing.cantidad) ?? 0;
+  const available = this.normalizeDecimal(ing.producto?.inventario?.cantidad_disponible);
 
-        if (required > 0) {
-          const possible = Math.floor(available / required);
-          if (possible < maxPreparable) {
-            maxPreparable = possible;
-          }
-        }
-      }
-    } else {
-      maxPreparable = 0;
+  // Si no hay inventario o el producto está null => available = 0
+  if (available == null || isNaN(available)) {
+    maxPreparable = 0;
+    continue;
+  }
+
+  if (required > 0) {
+    const possible = Math.floor(available / required);
+    if (!isNaN(possible) && possible < maxPreparable) {
+      maxPreparable = possible;
     }
+  }
+}
 
-    if (maxPreparable === Infinity) maxPreparable = 0;
+if (maxPreparable === Infinity) {
+  maxPreparable = 0;
+}
 
     return {
       id: record.id,
