@@ -8,8 +8,15 @@ import { MesasModule } from "controllers/mesas/mesas.module";
 import { CajaModule } from "controllers/caja/caja.module";
 
 @Module({
-  imports: [AuthModule, InventoryModule, PlatillosModule, OrdersModule, MesasModule, CajaModule],
+  imports: [
+    AuthModule,
+    InventoryModule,
+    PlatillosModule,
+    OrdersModule,
+    MesasModule,
+    CajaModule,
+  ],
   controllers: [],
   providers: [SupabaseService],
 })
-export class AppModule { }
+export class AppModule {}

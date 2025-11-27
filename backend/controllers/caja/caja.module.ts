@@ -4,7 +4,7 @@ import { CajaController } from "./caja.controller";
 import { CajaService } from "./caja.service";
 
 @Module({
-    controllers: [CajaController],
-    providers: [CajaService, SupabaseService],
+  controllers: [CajaController],
+  providers: [CajaService, SupabaseService],
 })
-export class CajaModule { }
+export class CajaModule {}

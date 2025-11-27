@@ -345,9 +345,7 @@ describe("AuthService", () => {
         ok: false,
         message: "No se pudo crear el usuario",
       });
-      expect(
-        supabaseClient.auth.admin.deleteUser,
-      ).toHaveBeenCalledWith("1");
+      expect(supabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith("1");
     });
 
     it("valida contraseñas débiles antes de llamar a Supabase", async () => {
@@ -398,9 +396,10 @@ describe("AuthService", () => {
         rol: 2,
         activo: true,
       });
-      expect(
-        supabaseClient.auth.admin.updateUserById,
-      ).toHaveBeenCalledWith("1", { password: "Nueva1234" });
+      expect(supabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        "1",
+        { password: "Nueva1234" },
+      );
       expect(updateBuilder.payloads[0]).toMatchObject({
         nombre: "Actualizado",
         rol_id: 2,
@@ -449,9 +448,7 @@ describe("AuthService", () => {
         ok: false,
         message: "La contraseña debe tener al menos 8 caracteres",
       });
-      expect(
-        supabaseClient.auth.admin.updateUserById,
-      ).not.toHaveBeenCalled();
+      expect(supabaseClient.auth.admin.updateUserById).not.toHaveBeenCalled();
     });
 
     it("fails if there are no changes", async () => {

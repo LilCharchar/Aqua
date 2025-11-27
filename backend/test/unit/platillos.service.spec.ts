@@ -13,13 +13,6 @@ function createListBuilder(response: ListResponse) {
   return { select };
 }
 
-function createGetBuilder(response: SingleResponse) {
-  const maybeSingle = jest.fn().mockResolvedValue(response);
-  const eq = jest.fn().mockReturnValue({ maybeSingle });
-  const select = jest.fn().mockReturnValue({ eq });
-  return { select };
-}
-
 function createInsertPlatilloBuilder(response: SingleResponse) {
   const single = jest.fn().mockResolvedValue(response);
   const select = jest.fn().mockReturnValue({ single });
@@ -120,7 +113,8 @@ describe("PlatillosService", () => {
             nombre: "Ceviche",
             descripcion: null,
             precio: 150.5,
-            disponible: true,
+            disponible: false,
+            imagenUrl: null,
             supervisorId: 3,
             supervisorNombre: "Ana",
             creadoEn: "2024-01-01",
@@ -133,6 +127,7 @@ describe("PlatillosService", () => {
                 cantidad: 0.5,
               },
             ],
+            cantidadPreparable: 0,
           },
         ],
       });
@@ -171,10 +166,12 @@ describe("PlatillosService", () => {
           descripcion: "Fresco",
           precio: 180,
           disponible: true,
+          imagenUrl: null,
           supervisorId: 2,
           supervisorNombre: "Lupita",
           creadoEn: "2024-02-01",
           ingredientes: [],
+          cantidadPreparable: 0,
         },
       };
 
@@ -198,6 +195,7 @@ describe("PlatillosService", () => {
         precio: 180,
         disponible: true,
         supervisor_id: 2,
+        imagen_url: null,
       });
       expect(ingredientBuilder.payloads[0]).toEqual({
         platillo_id: 9,
