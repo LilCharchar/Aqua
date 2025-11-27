@@ -625,7 +625,18 @@ export class OrdersService {
         return;
       }
 
-      // Registrar transacción de ingreso
+      // Obtener el pago recién insertado para ver si hubo cambio
+      const { data: pagoData } = await supabase
+        .from("pagos")
+        .select("cambio")
+        .eq("orden_id", orderId)
+        .order("fecha", { ascending: false })
+        .limit(1)
+        .single();
+
+      const cambio = pagoData?.cambio ? Number(pagoData.cambio) : 0;
+
+      // Registrar el monto completo como ingreso
       await supabase.from("transacciones_caja").insert({
         caja_id: cajaAbierta.id,
         tipo: "Ingreso",
@@ -633,7 +644,18 @@ export class OrdersService {
         descripcion: `Pago de orden #${orderId} (${metodoPago})`,
       });
 
-      console.log(`Ingreso registrado en caja #${cajaAbierta.id} por orden #${orderId}: $${monto}`);
+      // Si hubo cambio, registrarlo como egreso
+      if (cambio > 0) {
+        await supabase.from("transacciones_caja").insert({
+          caja_id: cajaAbierta.id,
+          tipo: "Egreso",
+          monto: this.toCurrency(cambio),
+          descripcion: `Cambio devuelto - Orden #${orderId}`,
+        });
+        console.log(`Ingreso: $${monto}, Cambio devuelto: $${cambio}, Neto en caja: $${monto - cambio} (Orden #${orderId})`);
+      } else {
+        console.log(`Ingreso registrado en caja #${cajaAbierta.id} por orden #${orderId}: $${monto}`);
+      }
     } catch (error) {
       console.error("Error al registrar ingreso en caja:", error);
       // No fallar el pago si hay error en caja, solo registrar el error
