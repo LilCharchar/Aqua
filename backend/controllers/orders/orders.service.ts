@@ -261,6 +261,20 @@ export class OrdersService {
 
     const supabase = this.supabaseService.getClient();
 
+    // Validar que haya una caja abierta
+    const { data: cajaAbierta } = await supabase
+      .from("caja")
+      .select("id")
+      .is("cerrado_en", null)
+      .maybeSingle();
+
+    if (!cajaAbierta) {
+      return {
+        ok: false,
+        message: "No se pueden crear órdenes sin una caja abierta. Por favor, abre la caja primero.",
+      };
+    }
+
     // Validar que la mesa existe y está activa
     if (mesaId) {
       const { data: mesaData, error: mesaError } = await supabase
@@ -570,6 +584,9 @@ export class OrdersService {
       return { ok: false, message: "No se pudo registrar el pago" };
     }
 
+    // Registrar ingreso en caja (si hay caja abierta)
+    await this.registerPaymentInCaja(orderId, monto, metodoPago, supabase);
+
     // Verificar si la orden debe marcarse como pagada
     const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);
     if (nuevoTotalPagado >= order.total) {
@@ -585,6 +602,42 @@ export class OrdersService {
     }
 
     return this.getOrderById(orderId);
+  }
+
+  private async registerPaymentInCaja(
+    orderId: number,
+    monto: number,
+    metodoPago: string,
+    supabase: SupabaseClient,
+  ): Promise<void> {
+    try {
+      // Buscar caja abierta
+      const { data: cajaAbierta } = await supabase
+        .from("caja")
+        .select("id")
+        .is("cerrado_en", null)
+        .order("abierto_en", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!cajaAbierta) {
+        console.warn(`Pago de orden #${orderId} registrado, pero no hay caja abierta para registrar el ingreso`);
+        return;
+      }
+
+      // Registrar transacción de ingreso
+      await supabase.from("transacciones_caja").insert({
+        caja_id: cajaAbierta.id,
+        tipo: "Ingreso",
+        monto: this.toCurrency(monto),
+        descripcion: `Pago de orden #${orderId} (${metodoPago})`,
+      });
+
+      console.log(`Ingreso registrado en caja #${cajaAbierta.id} por orden #${orderId}: $${monto}`);
+    } catch (error) {
+      console.error("Error al registrar ingreso en caja:", error);
+      // No fallar el pago si hay error en caja, solo registrar el error
+    }
   }
 
   private async calculateInventoryAdjustments(

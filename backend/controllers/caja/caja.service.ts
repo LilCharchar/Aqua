@@ -1,0 +1,389 @@
+import { Injectable } from "@nestjs/common";
+import { SupabaseService } from "../../src/supabase.service";
+import {
+  CajaResponse,
+  CajaSingleResponse,
+  CajasListResponse,
+  CajaTransaccionResponse,
+  CloseCajaDto,
+  CreateCajaDto,
+  CreateTransaccionDto,
+} from "./caja.dto";
+
+interface CajaRow {
+  id: number;
+  supervisor_id: string | null;
+  monto_inicial: string | number;
+  monto_final: string | number | null;
+  abierto_en: string | null;
+  cerrado_en: string | null;
+  usuario?:
+    | { id: string; nombre: string | null }
+    | { id: string; nombre: string | null }[]
+    | null;
+}
+
+interface TransaccionRow {
+  id: number;
+  tipo: string;
+  monto: string | number;
+  descripcion: string | null;
+  creado_en: string | null;
+}
+
+interface SupabaseClient {
+  from(table: string): any;
+}
+
+@Injectable()
+export class CajaService {
+  constructor(private readonly supabaseService: SupabaseService) {}
+
+  private readonly cajaSelect = `
+    id,
+    supervisor_id,
+    monto_inicial,
+    monto_final,
+    abierto_en,
+    cerrado_en,
+    usuario:usuarios!supervisor_id ( id, nombre )
+  `;
+
+  private toDecimal(value: string | number | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  private extractSingle<T>(value: T | T[] | null | undefined): T | null {
+    if (!value) return null;
+    return Array.isArray(value) ? value[0] || null : value;
+  }
+
+  private async fetchTransactions(
+    cajaId: number,
+    supabase: SupabaseClient,
+  ): Promise<TransaccionRow[]> {
+    const { data, error } = await supabase
+      .from("transacciones_caja")
+      .select("id, tipo, monto, descripcion, creado_en")
+      .eq("caja_id", cajaId)
+      .order("creado_en", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching transactions:", error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  private mapCaja(
+    record: CajaRow,
+    transactions: TransaccionRow[]
+  ): CajaResponse {
+    const usuario = this.extractSingle(record.usuario);
+    const montoInicial = this.toDecimal(record.monto_inicial);
+    const montoFinal = this.toDecimal(record.monto_final);
+
+    let totalIngresos = 0;
+    let totalEgresos = 0;
+
+    const mappedTransactions: CajaTransaccionResponse[] = transactions.map(
+      (t) => {
+        const monto = this.toDecimal(t.monto);
+        if (t.tipo === "Ingreso") totalIngresos += monto;
+        if (t.tipo === "Egreso") totalEgresos += monto;
+
+        return {
+          id: t.id,
+          tipo: t.tipo,
+          monto,
+          descripcion: t.descripcion,
+          creado_en: t.creado_en,
+        };
+      }
+    );
+
+    const saldoActual = montoInicial + totalIngresos - totalEgresos;
+
+    // Calcular diferencia solo si la caja está cerrada (tiene monto_final)
+    let diferencia: number | null = null;
+    if (record.monto_final !== null && record.monto_final !== undefined) {
+      diferencia = montoFinal - saldoActual;
+    }
+
+    return {
+      id: record.id,
+      supervisorId: record.supervisor_id,
+      supervisorNombre: usuario?.nombre || null,
+      montoInicial,
+      montoFinal,
+      abiertoEn: record.abierto_en,
+      cerradoEn: record.cerrado_en,
+      totalIngresos,
+      totalEgresos,
+      saldoActual,
+      diferencia,
+      transacciones: mappedTransactions,
+    };
+  }
+
+  async getCurrentCaja(): Promise<CajaSingleResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      const { data, error } = await supabase
+        .from("caja")
+        .select(this.cajaSelect)
+        .is("cerrado_en", null)
+        .order("abierto_en", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching current caja:", error);
+        return { ok: false, message: error.message };
+      }
+
+      if (!data) {
+        return { ok: false, message: "No hay caja abierta actualmente" };
+      }
+
+      const transactions = await this.fetchTransactions(data.id, supabase);
+      const caja = this.mapCaja(data, transactions);
+
+      return { ok: true, caja };
+    } catch (error: any) {
+      console.error("Unexpected error in getCurrentCaja:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+
+  async listCajas(): Promise<CajasListResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      const { data, error } = await supabase
+        .from("caja")
+        .select(this.cajaSelect)
+        .order("abierto_en", { ascending: false });
+
+      if (error) {
+        console.error("Error listing cajas:", error);
+        return { ok: false, message: error.message };
+      }
+
+      if (!data || data.length === 0) {
+        return { ok: true, cajas: [] };
+      }
+
+      const cajas: CajaResponse[] = [];
+      for (const record of data) {
+        const transactions = await this.fetchTransactions(record.id, supabase);
+        cajas.push(this.mapCaja(record, transactions));
+      }
+
+      return { ok: true, cajas };
+    } catch (error: any) {
+      console.error("Unexpected error in listCajas:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+
+  async getCajaById(id: number): Promise<CajaSingleResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      const { data, error } = await supabase
+        .from("caja")
+        .select(this.cajaSelect)
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching caja by id:", error);
+        return { ok: false, message: error.message };
+      }
+
+      if (!data) {
+        return { ok: false, message: "Caja no encontrada" };
+      }
+
+      const transactions = await this.fetchTransactions(data.id, supabase);
+      const caja = this.mapCaja(data, transactions);
+
+      return { ok: true, caja };
+    } catch (error: any) {
+      console.error("Unexpected error in getCajaById:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+
+  async openCaja(dto: CreateCajaDto): Promise<CajaSingleResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      // Validate only one caja can be open
+      const { data: openCaja } = await supabase
+        .from("caja")
+        .select("id")
+        .is("cerrado_en", null)
+        .maybeSingle();
+
+      if (openCaja) {
+        return {
+          ok: false,
+          message: "Ya existe una caja abierta. Ciérrala antes de abrir otra.",
+        };
+      }
+
+      // Validate amount
+      if (!Number.isFinite(dto.monto_inicial) || dto.monto_inicial < 0) {
+        return { ok: false, message: "Monto inicial inválido" };
+      }
+
+      // Create new caja
+      const { data: newCaja, error: insertError } = await supabase
+        .from("caja")
+        .insert({
+          supervisor_id: dto.supervisor_id,
+          monto_inicial: dto.monto_inicial,
+        })
+        .select(this.cajaSelect)
+        .single();
+
+      if (insertError || !newCaja) {
+        console.error("Error creating caja:", insertError);
+        return {
+          ok: false,
+          message: insertError?.message || "Error al crear caja",
+        };
+      }
+
+      const caja = this.mapCaja(newCaja, []);
+
+      return { ok: true, caja };
+    } catch (error: any) {
+      console.error("Unexpected error in openCaja:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+
+  async closeCaja(id: number, dto: CloseCajaDto): Promise<CajaSingleResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      // Validate caja exists and is open
+      const { data: existingCaja, error: fetchError } = await supabase
+        .from("caja")
+        .select("id, cerrado_en")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (fetchError || !existingCaja) {
+        return { ok: false, message: "Caja no encontrada" };
+      }
+
+      if (existingCaja.cerrado_en) {
+        return { ok: false, message: "Esta caja ya está cerrada" };
+      }
+
+      // Validate amount
+      if (!Number.isFinite(dto.monto_final) || dto.monto_final < 0) {
+        return { ok: false, message: "Monto final inválido" };
+      }
+
+      // Close caja
+      const { data: updatedCaja, error: updateError } = await supabase
+        .from("caja")
+        .update({
+          monto_final: dto.monto_final,
+          cerrado_en: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select(this.cajaSelect)
+        .single();
+
+      if (updateError || !updatedCaja) {
+        console.error("Error closing caja:", updateError);
+        return {
+          ok: false,
+          message: updateError?.message || "Error al cerrar caja",
+        };
+      }
+
+      const transactions = await this.fetchTransactions(id, supabase);
+      const caja = this.mapCaja(updatedCaja, transactions);
+
+      return { ok: true, caja };
+    } catch (error: any) {
+      console.error("Unexpected error in closeCaja:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+
+  async addTransaction(
+    cajaId: number,
+    dto: CreateTransaccionDto
+  ): Promise<CajaSingleResponse> {
+    try {
+      const supabase = this.supabaseService.getClient();
+
+      // Validate caja exists and is open
+      const { data: existingCaja, error: fetchError } = await supabase
+        .from("caja")
+        .select("id, cerrado_en")
+        .eq("id", cajaId)
+        .maybeSingle();
+
+      if (fetchError || !existingCaja) {
+        return { ok: false, message: "Caja no encontrada" };
+      }
+
+      if (existingCaja.cerrado_en) {
+        return {
+          ok: false,
+          message: "No se pueden agregar transacciones a una caja cerrada",
+        };
+      }
+
+      // Validate transaction data
+      if (!["Ingreso", "Egreso"].includes(dto.tipo)) {
+        return {
+          ok: false,
+          message:
+            "Tipo de transacción inválido. Debe ser 'Ingreso' o 'Egreso'",
+        };
+      }
+
+      if (!Number.isFinite(dto.monto) || dto.monto <= 0) {
+        return { ok: false, message: "Monto inválido. Debe ser mayor a 0" };
+      }
+
+      // Insert transaction
+      const { error: insertError } = await supabase
+        .from("transacciones_caja")
+        .insert({
+          caja_id: cajaId,
+          tipo: dto.tipo,
+          monto: dto.monto,
+          descripcion: dto.descripcion || null,
+        });
+
+      if (insertError) {
+        console.error("Error adding transaction:", insertError);
+        return {
+          ok: false,
+          message: insertError.message || "Error al agregar transacción",
+        };
+      }
+
+      // Return updated caja with all transactions
+      return this.getCajaById(cajaId);
+    } catch (error: any) {
+      console.error("Unexpected error in addTransaction:", error);
+      return { ok: false, message: error?.message || "Error desconocido" };
+    }
+  }
+}
