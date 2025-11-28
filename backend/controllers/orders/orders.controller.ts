@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -19,8 +20,14 @@ import { OrdersService } from "./orders.service";
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  // orders.controller.ts
   @Get()
   async listOrders(@Query("status") status?: string) {
+    // si no se pasa status, devolvemos sólo las órdenes activas
+    if (!status) {
+      // usaremos 'Pendiente' como filtro por defecto en el controller
+      return this.ordersService.listOrders("Pendiente");
+    }
     return this.ordersService.listOrders(status);
   }
 
@@ -41,7 +48,7 @@ export class OrdersController {
   @Patch(":id/status")
   async updateStatus(
     @Param("id") id: string,
-    @Body() dto: UpdateOrderStatusDto,
+    @Body() dto: UpdateOrderStatusDto
   ) {
     const orderId = this.parseNumericId(id);
     if (!orderId) {
@@ -59,10 +66,23 @@ export class OrdersController {
     return this.ordersService.addItems(orderId, dto);
   }
 
+  @Delete(":id/items/:itemId")
+  async removeItem(@Param("id") id: string, @Param("itemId") itemId: string) {
+    const orderId = this.parseNumericId(id);
+    const detailId = this.parseNumericId(itemId);
+    if (!orderId || !detailId) {
+      return { ok: false, message: "ID inválido" };
+    }
+    // delegate to service
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: service method exists
+    return this.ordersService.removeItem(orderId, detailId);
+  }
+
   @Post(":id/payments")
   async registerPayment(
     @Param("id") id: string,
-    @Body() dto: RegisterPaymentDto,
+    @Body() dto: RegisterPaymentDto
   ) {
     const orderId = this.parseNumericId(id);
     if (!orderId) {
