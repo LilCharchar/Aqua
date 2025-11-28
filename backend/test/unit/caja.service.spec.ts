@@ -158,6 +158,85 @@ describe("CajaService", () => {
     });
   });
 
+  describe("closeCaja", () => {
+    it("debería cerrar una caja abierta calculando la diferencia", async () => {
+      const cajaId = 1;
+      const dto = { monto_final: 1300 };
+
+      const existingCajaBuilder = createMaybeSingleBuilder({
+        data: {
+          id: cajaId,
+          cerrado_en: null,
+          monto_inicial: 1000,
+        },
+        error: null,
+      });
+
+      const transactions = [
+        {
+          id: 1,
+          tipo: "Ingreso",
+          monto: 500,
+          descripcion: "Venta",
+          creado_en: "2025-01-01T12:00:00Z",
+        },
+        {
+          id: 2,
+          tipo: "Egreso",
+          monto: 100,
+          descripcion: "Reembolso",
+          creado_en: "2025-01-01T13:00:00Z",
+        },
+      ];
+      const initialTransactionsBuilder = createSelectListBuilder({
+        data: transactions,
+        error: null,
+      });
+
+      const updateBuilder = {
+        update: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({
+          data: {
+            id: cajaId,
+            supervisor_id: "uuid-123",
+            monto_inicial: 1000,
+            monto_final: dto.monto_final,
+            diferencia: -100,
+            abierto_en: "2025-01-01T10:00:00Z",
+            cerrado_en: "2025-01-01T18:00:00Z",
+            usuario: { id: "uuid-123", nombre: "Supervisor Test" },
+          },
+          error: null,
+        }),
+      };
+
+      const finalTransactionsBuilder = createSelectListBuilder({
+        data: transactions,
+        error: null,
+      });
+
+      fromMock
+        .mockImplementationOnce(() => existingCajaBuilder)
+        .mockImplementationOnce(() => initialTransactionsBuilder)
+        .mockImplementationOnce(() => updateBuilder)
+        .mockImplementationOnce(() => finalTransactionsBuilder);
+
+      const result = await cajaService.closeCaja(cajaId, dto);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.caja.id).toBe(cajaId);
+        expect(result.caja.montoFinal).toBe(1300);
+        expect(result.caja.totalIngresos).toBe(500);
+        expect(result.caja.totalEgresos).toBe(100);
+        expect(result.caja.diferencia).toBe(-100);
+        expect(result.caja.cerradoEn).toBe("2025-01-01T18:00:00Z");
+      }
+    });
+  });
+
   describe("getCurrentCaja", () => {
     it("debería obtener la caja actualmente abierta", async () => {
       const cajaRow = {
