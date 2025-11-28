@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import OrderCard from "../../src/components/ui/OrderCard";
 import OrderModal from "../../src/components/ui/OrderModal";
 import Modal from "../../src/components/ui/modal";
+import { RotateCw } from "lucide-react";
+import logo from "../../assets/logo.png";
 
 type MeseroOrdersProps = {
   user: User;
@@ -23,9 +25,9 @@ type OrderSummary = {
   total?: number;
 };
 
-const API_URL = import.meta.env.VITE_API_URL ?? "/api";
+const API_URL = "/api";
 
-export function Orders({ user }: MeseroOrdersProps) {
+export function Orders({ user, logout }: MeseroOrdersProps) {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,16 +76,23 @@ export function Orders({ user }: MeseroOrdersProps) {
   return (
     <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)] p-8">
       <div className="m-4">
-        <div className="flex items-center gap-4">
-          <span className="text-xl manrope-bold">{user?.nombre}</span>
-          <div className="ml-auto">
-            <span className="text-s text-[var(--text-primary)]">Mesero</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-center mt-4">
-          <span className=" text-3xl manrope-bold">Ordenes</span>
+        <div className="flex items-center gap-4 mb-2">
+          <img src={logo} alt="Logo" className="h-12 w-auto" />
+          <h1 className="text-2xl manrope-bold">{user?.nombre ?? "—"}</h1>
+          <span className="text-sm ml-auto">Mesero</span>
         </div>
         <Separator />
+      </div>
+      <div className="mx-4 flex items-center justify-between flex-wrap gap-3">
+        <span className="text-3xl manrope-bold">Ordenes</span>
+        <button
+          onClick={fetchOrders}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--text-primary)] text-sm hover:bg-[var(--text-primary)]/10 transition disabled:opacity-60"
+        >
+          <RotateCw size={18} className={loading ? "animate-spin" : ""} />
+          <span>Actualizar</span>
+        </button>
       </div>
 
       <div className="flex-1">
@@ -117,6 +126,15 @@ export function Orders({ user }: MeseroOrdersProps) {
             Crear orden
           </button>
         </div>
+      </div>
+
+      <div className="mt-auto flex justify-end items-center gap-4 mr-10">
+        <button
+          className="hover:scale-105 transition-transform duration-200 text-sm"
+          onClick={logout}
+        >
+          Cerrar sesión
+        </button>
       </div>
 
       <OrderModal

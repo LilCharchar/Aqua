@@ -282,10 +282,16 @@ export default function OrderModal({
     setLoading(true);
 
     try {
-      const toSend = buildItemsPayload(items);
+      // avoid duplicating platillos already guardados cuando editamos
+      const rowsToSend = orderId ? items.filter((it) => !it.detailId) : items;
+      const toSend = buildItemsPayload(rowsToSend);
 
       if (toSend.length === 0) {
-        setError("Agrega al menos un platillo con cantidad válida");
+        setError(
+          orderId
+            ? "Agrega al menos un platillo nuevo para guardar"
+            : "Agrega al menos un platillo con cantidad válida"
+        );
         setLoading(false);
         return;
       }
