@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_URL = "/api";
 
@@ -8,12 +8,14 @@ type OrderModalProps = {
   onSaved: () => void;
   orderId?: number | null;
   userId?: string;
+  userName?: string;
+  lockMesero?: boolean;
 };
 
 type Mesa = { id: number; numero: number | null };
 type Platillo = { id: number; nombre: string; precio: number };
 // Agregamos tipo para Usuarios
-type Usuario = { id: string; nombre: string; rol?: string };
+type Usuario = { id: string; nombre: string | null; rol?: string };
 
 type ItemRow = {
   key: string;
@@ -36,6 +38,8 @@ export default function OrderModal({
   onSaved,
   orderId,
   userId,
+  userName,
+  lockMesero = false,
 }: OrderModalProps) {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [platillos, setPlatillos] = useState<Platillo[]>([]);
@@ -65,6 +69,14 @@ export default function OrderModal({
     paymentMethod === "Efectivo"
       ? Math.max(0, (Number(paymentAmount) || 0) - total)
       : 0;
+
+  const resolvedMeseroName = useMemo(() => {
+    if (userName && userName.trim()) return userName;
+    const found = usuarios.find((u) => String(u.id) === String(meseroId));
+    if (found?.nombre) return found.nombre;
+    if (meseroId) return `ID: ${meseroId}`;
+    return "Sin asignar";
+  }, [userName, usuarios, meseroId]);
 
   useEffect(() => {
     if (userId) {
@@ -132,12 +144,21 @@ export default function OrderModal({
   // Nueva función para cargar usuarios
   async function loadUsuarios() {
     try {
-      // Intentamos endpoints comunes, ajusta según tu backend
-      const res = await fetch(`${API_URL}/usuarios`);
+      const res = await fetch(`${API_URL}/auth/users`);
       const data = await res.json();
-      setUsuarios(data.usuarios ?? data.data ?? []);
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message ?? "No se pudo obtener usuarios");
+      }
+      const mapped =
+        (data.users ?? []).map((u: any) => ({
+          id: String(u.userId ?? u.id ?? ""),
+          nombre: u.nombre ?? null,
+          rol: u.rol,
+        })) ?? [];
+      setUsuarios(mapped);
     } catch (e) {
       console.warn("No se pudo cargar la lista de usuarios", e);
+      setUsuarios([]);
     }
   }
 
@@ -161,8 +182,10 @@ export default function OrderModal({
         setMesaNumeroDisplay(String(foundMesaNum));
       }
 
-      if (o.mesero_id || o.meseroId) {
+      if (!lockMesero && (o.mesero_id || o.meseroId)) {
         setMeseroId(String(o.mesero_id || o.meseroId));
+      } else if (lockMesero && userId) {
+        setMeseroId(userId);
       }
 
       const mapped: ItemRow[] =
@@ -482,7 +505,11 @@ export default function OrderModal({
                 <label className="text-sm text-[var(--text-secondary)]">
                   Encargado
                 </label>
-                {usuarios.length > 0 ? (
+                {lockMesero ? (
+                  <div className="w-full p-3 mt-1 rounded-lg bg-[var(--options)] border border-[rgba(255,255,255,0.1)] text-[var(--text-primary)] manrope-medium">
+                    {resolvedMeseroName}
+                  </div>
+                ) : usuarios.length > 0 ? (
                   <select
                     value={meseroId}
                     onChange={(e) => setMeseroId(e.target.value)}

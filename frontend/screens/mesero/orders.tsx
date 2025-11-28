@@ -139,6 +139,9 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
 
       <OrderModal
         isOpen={showCreate}
+        userId={user?.id}
+        userName={user?.nombre}
+        lockMesero
         onClose={() => {
           setShowCreate(false);
         }}
@@ -148,6 +151,9 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
       <OrderModal
         isOpen={!!editOrderId}
         orderId={editOrderId ?? undefined}
+        userId={user?.id}
+        userName={user?.nombre}
+        lockMesero
         onClose={() => setEditOrderId(null)}
         onSaved={() => {
           setEditOrderId(null);
