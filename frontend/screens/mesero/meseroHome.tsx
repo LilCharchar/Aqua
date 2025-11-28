@@ -12,6 +12,7 @@ export function MeseroHome({ user, logout }: MeseroHomeProps) {
     <div>
       <h1>Mesero: {user.nombre}</h1>
       <button onClick={logout}>Cerrar sesión</button>
+      
     </div>
   );
 }
