@@ -4,13 +4,14 @@ import dashboardIcon from "../../../assets/dashboardIcon.svg";
 import logo from "../../../assets/logo.png";
 import inventoryIcon from "../../../assets/inventoryIcon.svg";
 import dishesIcon from "../../../assets/dishesIcon.svg";
+import ventasIcon from "../../../assets/ventasIcon.png";
 import { Menu } from 'lucide-react'
 
 export type NavItem ={
   id: string;
   name: string;
   icon: React.ReactNode;
-  path: 'home' | 'orders' | 'inventory' | 'dishes' | 'dashboard';
+  path: 'home' | 'orders' | 'inventory' | 'dishes' | 'dashboard' | 'ventas';
 }
 
 const navItems: NavItem[]=[
@@ -18,7 +19,8 @@ const navItems: NavItem[]=[
   { id: '2', name: 'Orders', icon: <img src={ordersIcon} className="w-[50px] h-[50px]" />, path: 'orders' },
   { id: '3', name: 'Inventory', icon: <img src={inventoryIcon} className="w-[50px] h-[50px]" />, path: 'inventory' },
   { id: '4', name: 'Dishes', icon: <img src={dishesIcon} className="w-[50px] h-[50px]" />, path: 'dishes' },
-  { id: '5', name: 'Dashboard', icon: <img src={dashboardIcon} className="w-[50px] h-[50px]" />, path: 'dashboard' },
+  { id: '5', name: 'ventas', icon: <img src={ventasIcon} className="w-[45px] h-[45px]" />, path: 'ventas' },
+  { id: '6', name: 'Dashboard', icon: <img src={dashboardIcon} className="w-[50px] h-[50px]" />, path: 'dashboard' },
 ]
 
 interface SidebarProps{

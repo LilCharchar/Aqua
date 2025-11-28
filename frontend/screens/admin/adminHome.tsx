@@ -6,6 +6,7 @@ import {Usuarios} from "../../src/components/getuser";
 import Modal from "../../src/components/ui/modal";
 import Button from "../../src/components/ui/button";
 import Input from "../../src/components/ui/input";
+import { toast } from "sonner";
 
 type AdminHomeProps = {
   user: User;
@@ -75,6 +76,7 @@ export function AdminHome({ user, logout }: AdminHomeProps) {
       }
 
       await usuariosActions?.refresh();
+      toast.success("Usuario creado exitosamente. Se requiere verificar el correo.");
       resetCreateForm();
       setIsModalOpen(false);
     } catch (err) {

@@ -39,12 +39,12 @@ interface DetalleOrdenRow {
   precio_unit: string | number | null;
   subtotal: string | number | null;
   platillo?:
-  | {
-    id: number;
-    nombre: string;
-  }
-  | { id: number; nombre: string }[]
-  | null;
+    | {
+        id: number;
+        nombre: string;
+      }
+    | { id: number; nombre: string }[]
+    | null;
 }
 
 interface PagoRow {
@@ -158,7 +158,7 @@ export type OrderSingleResponse =
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   private readonly orderSelect = `
     id,
@@ -313,7 +313,7 @@ export class OrdersService {
 
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
-      supabase,
+      supabase
     );
     if (!detailResult.ok) {
       return detailResult;
@@ -323,7 +323,7 @@ export class OrdersService {
 
     const inventoryResult = await this.calculateInventoryAdjustments(
       itemsValidation.items,
-      supabase,
+      supabase
     );
 
     if (!inventoryResult.ok) {
@@ -382,10 +382,7 @@ export class OrdersService {
 
     // Marcar mesa como ocupada (no disponible)
     if (mesaId) {
-      await supabase
-        .from("mesas")
-        .update({ activa: false })
-        .eq("id", mesaId);
+      await supabase.from("mesas").update({ activa: false }).eq("id", mesaId);
     }
 
     return this.getOrderById(orderId);
@@ -393,7 +390,7 @@ export class OrdersService {
 
   async addItems(
     orderId: number,
-    dto: AddOrderItemsDto,
+    dto: AddOrderItemsDto
   ): Promise<OrderSingleResponse> {
     const itemsValidation = this.validateItems(dto.items);
     if (!itemsValidation.ok) {
@@ -420,15 +417,21 @@ export class OrdersService {
 
     // Validar que la orden no esté pagada o anulada
     if (orderRow.estado === "Pagada") {
-      return { ok: false, message: "No se pueden agregar items a una orden pagada" };
+      return {
+        ok: false,
+        message: "No se pueden agregar items a una orden pagada",
+      };
     }
     if (orderRow.estado === "Anulada") {
-      return { ok: false, message: "No se pueden agregar items a una orden anulada" };
+      return {
+        ok: false,
+        message: "No se pueden agregar items a una orden anulada",
+      };
     }
 
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
-      supabase,
+      supabase
     );
     if (!detailResult.ok) {
       return detailResult;
@@ -436,14 +439,14 @@ export class OrdersService {
 
     const inventoryResult = await this.calculateInventoryAdjustments(
       itemsValidation.items,
-      supabase,
+      supabase
     );
     if (!inventoryResult.ok) {
       return inventoryResult;
     }
 
     const currentTotal = this.toCurrency(
-      this.normalizeDecimal(orderRow.total) ?? 0,
+      this.normalizeDecimal(orderRow.total) ?? 0
     );
     const newTotal = this.toCurrency(currentTotal + detailResult.total);
 
@@ -501,7 +504,7 @@ export class OrdersService {
 
   async updateOrderStatus(
     orderId: number,
-    dto: UpdateOrderStatusDto,
+    dto: UpdateOrderStatusDto
   ): Promise<OrderSingleResponse> {
     const normalizedStatus = this.normalizeStatus(dto.estado);
     if (!normalizedStatus) {
@@ -525,7 +528,7 @@ export class OrdersService {
 
   async registerPayment(
     orderId: number,
-    dto: RegisterPaymentDto,
+    dto: RegisterPaymentDto
   ): Promise<OrderSingleResponse> {
     const metodoPago = this.normalizePaymentMethod(dto.metodo_pago);
     if (!metodoPago) {
@@ -590,7 +593,10 @@ export class OrdersService {
     // Verificar si la orden debe marcarse como pagada
     const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);
     if (nuevoTotalPagado >= order.total) {
-      await supabase.from("ordenes").update({ estado: "Pagada" }).eq("id", orderId);
+      await supabase
+        .from("ordenes")
+        .update({ estado: "Pagada" })
+        .eq("id", orderId);
 
       // Liberar mesa (marcarla como disponible)
       if (order.mesaId) {
@@ -664,7 +670,7 @@ export class OrdersService {
 
   private async calculateInventoryAdjustments(
     items: NormalizedOrderItem[],
-    supabase: SupabaseClient,
+    supabase: SupabaseClient
   ): Promise<
     { ok: true; updates: InventoryUpdateRow[] } | { ok: false; message: string }
   > {
@@ -682,7 +688,7 @@ export class OrdersService {
         producto_id,
         cantidad,
         producto:productos ( id, nombre )
-      `,
+      `
       )
       .in("platillo_id", platilloIds);
 
@@ -694,7 +700,7 @@ export class OrdersService {
     }
 
     const quantityByPlatillo = new Map(
-      items.map((item) => [item.platilloId, item.cantidad]),
+      items.map((item) => [item.platilloId, item.cantidad])
     );
 
     const consumption = new Map<
@@ -756,7 +762,7 @@ export class OrdersService {
       }
 
       const disponible = this.normalizeDecimal(
-        inventoryRow.cantidad_disponible,
+        inventoryRow.cantidad_disponible
       );
       const restante = disponible - info.required;
       if (restante < 0) {
@@ -778,7 +784,7 @@ export class OrdersService {
 
   private async buildDetailPayload(
     items: NormalizedOrderItem[],
-    supabase: SupabaseClient,
+    supabase: SupabaseClient
   ): Promise<
     | { ok: true; detailPayload: DetailInsertRow[]; total: number }
     | { ok: false; message: string }
@@ -840,10 +846,141 @@ export class OrdersService {
 
   private async deleteOrderDetails(
     detailIds: number[],
-    supabase: SupabaseClient,
+    supabase: SupabaseClient
   ) {
     if (!detailIds.length) return;
     await supabase.from("detalle_orden").delete().in("id", detailIds);
+  }
+
+  /**
+   * Remove a single detail row from an order, restore inventory and update order total.
+   */
+  async removeItem(
+    orderId: number,
+    detailId: number
+  ): Promise<OrderSingleResponse> {
+    const supabase = this.supabaseService.getClient();
+
+    // Fetch order state and detail row
+    const [
+      { data: orderData, error: orderError },
+      { data: detailData, error: detailError },
+    ] = await Promise.all([
+      supabase
+        .from("ordenes")
+        .select("id, estado, total, mesa_id")
+        .eq("id", orderId)
+        .maybeSingle(),
+      supabase
+        .from("detalle_orden")
+        .select("id, platillo_id, cantidad, subtotal")
+        .eq("id", detailId)
+        .maybeSingle(),
+    ]);
+
+    if (orderError || !orderData) {
+      return { ok: false, message: "Orden no encontrada" };
+    }
+    if (detailError || !detailData) {
+      return { ok: false, message: "Ítem no encontrado" };
+    }
+
+    const orderRow = orderData as {
+      id: number;
+      estado: string;
+      total: string | number | null;
+      mesa_id: number | null;
+    };
+    if (orderRow.estado === "Pagada" || orderRow.estado === "Anulada") {
+      return {
+        ok: false,
+        message: "No se pueden modificar órdenes en ese estado",
+      };
+    }
+
+    const detailRow = detailData as {
+      id: number;
+      platillo_id: number | null;
+      cantidad: string | number;
+      subtotal: string | number | null;
+    };
+
+    const platilloId = detailRow.platillo_id ?? 0;
+    const cantidad = this.normalizeInteger(detailRow.cantidad) ?? 0;
+    const subtotal = this.toCurrency(detailRow.subtotal ?? 0);
+
+    // Delete the detail row
+    const { error: delError } = await supabase
+      .from("detalle_orden")
+      .delete()
+      .eq("id", detailId);
+    if (delError) {
+      return { ok: false, message: "No se pudo eliminar el ítem" };
+    }
+
+    // Update order total
+    const currentTotal = this.toCurrency(
+      this.normalizeDecimal(orderRow.total) ?? 0
+    );
+    const newTotal = this.toCurrency(currentTotal - subtotal);
+    const { error: totalError } = await supabase
+      .from("ordenes")
+      .update({ total: newTotal })
+      .eq("id", orderId);
+    if (totalError) {
+      return {
+        ok: false,
+        message: "No se pudo actualizar el total de la orden",
+      };
+    }
+
+    // Restore inventory for the removed platillo
+    if (platilloId && cantidad > 0) {
+      // get ingredients for the platillo
+      const { data: ingredients } = await supabase
+        .from("ingredientes_platillo")
+        .select("producto_id, cantidad")
+        .eq("platillo_id", platilloId);
+
+      const updates: InventoryUpdateRow[] = [];
+      for (const ing of (ingredients ?? []) as {
+        producto_id: number | null;
+        cantidad: string | number;
+      }[]) {
+        const productoId = ing.producto_id ?? 0;
+        if (!productoId) continue;
+        const unitQty = this.normalizeDecimal(ing.cantidad);
+        if (unitQty <= 0) continue;
+        const restore = this.toQuantity(unitQty * cantidad);
+
+        // fetch existing inventory row
+        const { data: invRows } = await supabase
+          .from("inventario")
+          .select("id, producto_id, cantidad_disponible")
+          .eq("producto_id", productoId)
+          .maybeSingle();
+        const existingQty = this.normalizeDecimal(
+          invRows?.cantidad_disponible ?? 0
+        );
+        const newQty = this.toQuantity(existingQty + restore);
+        updates.push({ producto_id: productoId, cantidad_disponible: newQty });
+      }
+
+      if (updates.length > 0) {
+        const { error: invError } = await supabase
+          .from("inventario")
+          .upsert(updates, { onConflict: "producto_id" });
+        if (invError) {
+          // not critical to rollback deletion, but signal error
+          return {
+            ok: false,
+            message: "Ítem eliminado pero no se pudo restaurar inventario",
+          };
+        }
+      }
+    }
+
+    return this.getOrderById(orderId);
   }
 
   private mapOrder(record: OrdenRow): OrderResponse {
@@ -857,7 +994,7 @@ export class OrdersService {
 
     const total = this.toCurrency(this.normalizeDecimal(record.total) ?? 0);
     const totalPagado = this.toCurrency(
-      pagos.reduce((acc, pago) => acc + pago.monto, 0),
+      pagos.reduce((acc, pago) => acc + pago.monto, 0)
     );
     const saldoPendiente = this.toCurrency(total - totalPagado);
 
@@ -957,7 +1094,7 @@ export class OrdersService {
   }
 
   private normalizeNumericId(
-    input?: number | string | null,
+    input?: number | string | null
   ): number | null | undefined {
     if (input === undefined) return undefined;
     if (input === null) return null;
@@ -976,7 +1113,7 @@ export class OrdersService {
   }
 
   private normalizeInteger(
-    value: string | number | null | undefined,
+    value: string | number | null | undefined
   ): number | null {
     if (value === null || value === undefined) return null;
     const parsed = Number(value);
@@ -996,7 +1133,7 @@ export class OrdersService {
 
   private async rollbackOrder(
     orderId: number,
-    supabase: SupabaseClient,
+    supabase: SupabaseClient
   ): Promise<void> {
     try {
       await supabase.from("ordenes").delete().eq("id", orderId);

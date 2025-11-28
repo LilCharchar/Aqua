@@ -1,12 +1,13 @@
 import React from "react";
 
 type ModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    title?: string;
-    children: React.ReactNode;
-    width?: string;
-    closeOnBackdrop?: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+  width?: string;
+  closeOnBackdrop?: boolean;
+  contentClassName?: string;
 };
 
 const Modal: React.FC<ModalProps> = ({
@@ -16,6 +17,7 @@ const Modal: React.FC<ModalProps> = ({
   children,
   width = "max-w-2xl",
   closeOnBackdrop = true,
+  contentClassName = "",
 }) => {
   if (!isOpen) return null;
   return (
