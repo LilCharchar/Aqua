@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import OrderCard from "../../src/components/ui/OrderCard";
 import OrderModal from "../../src/components/ui/OrderModal";
 import Modal from "../../src/components/ui/modal";
+import { RotateCw } from "lucide-react";
 
 type SupervisorOrdersProps = {
   user: User;
@@ -82,8 +83,19 @@ export function Orders({ user }: SupervisorOrdersProps) {
             </span>
           </div>
         </div>
-        <div className="flex items-center justify-center mt-4">
-          <span className=" text-3xl manrope-bold">Ordenes</span>
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+          <span className="text-3xl manrope-bold">Ordenes</span>
+          <button
+            onClick={fetchOrders}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--text-primary)] text-sm hover:bg-[var(--text-primary)]/10 transition disabled:opacity-60"
+          >
+            <RotateCw
+              size={18}
+              className={loading ? "animate-spin" : ""}
+            />
+            <span className="hidden sm:inline">Actualizar</span>
+          </button>
         </div>
         <Separator />
       </div>
