@@ -95,6 +95,39 @@ export class CajaService {
     return response.data ?? [];
   }
 
+  private async getPreviousCajaMontoFinal(
+    supabase: SupabaseClient,
+  ): Promise<number> {
+    try {
+      const response: PostgrestSingleResponse<{
+        monto_final: number | string | null;
+      } | null> = await supabase
+        .from("caja")
+        .select("monto_final")
+        .order("abierto_en", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (response.error) {
+        console.warn(
+          "No se pudo obtener el monto final anterior:",
+          response.error,
+        );
+        return 0;
+      }
+
+      const lastCaja = response.data;
+      if (!lastCaja || lastCaja.monto_final === null) {
+        return 0;
+      }
+
+      return this.toDecimal(lastCaja.monto_final);
+    } catch (error) {
+      console.error("Error al consultar la última caja:", error);
+      return 0;
+    }
+  }
+
   private mapCaja(
     record: CajaRow,
     transactions: TransaccionRow[],
@@ -277,17 +310,14 @@ export class CajaService {
         };
       }
 
-      // Validate amount
-      if (!Number.isFinite(dto.monto_inicial) || dto.monto_inicial < 0) {
-        return { ok: false, message: "Monto inicial inválido" };
-      }
+      const montoInicial = await this.getPreviousCajaMontoFinal(supabase);
 
       // Create new caja
       const insertResponse: PostgrestSingleResponse<CajaRow> = await supabase
         .from("caja")
         .insert({
           supervisor_id: dto.supervisor_id,
-          monto_inicial: dto.monto_inicial,
+          monto_inicial: montoInicial,
         })
         .select(this.cajaSelect)
         .single();

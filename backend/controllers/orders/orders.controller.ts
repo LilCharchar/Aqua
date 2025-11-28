@@ -31,6 +31,11 @@ export class OrdersController {
     return this.ordersService.listOrders(status);
   }
 
+  @Get("payments")
+  async listPayments() {
+    return this.ordersService.listPayments();
+  }
+
   @Get(":id")
   async getOrder(@Param("id") id: string) {
     const orderId = this.parseNumericId(id);

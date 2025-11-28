@@ -173,6 +173,7 @@ npm run format            # Formatea código con Prettier
 
 **Endpoints:**
 - `GET /api/orders` - Listar órdenes (filtrable por estado)
+- `GET /api/orders/payments` - Listar historial completo de pagos
 - `GET /api/orders/:id` - Obtener orden por ID
 - `POST /api/orders` - Crear nueva orden
 - `PATCH /api/orders/:id/status` - Actualizar estado de orden

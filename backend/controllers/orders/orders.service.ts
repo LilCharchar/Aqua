@@ -53,6 +53,16 @@ interface PagoRow {
   monto: string | number;
   cambio: string | number | null;
   fecha: string | null;
+  orden_id?: number | null;
+  orden?: PaymentOrderRow | PaymentOrderRow[] | null;
+}
+
+interface PaymentOrderRow {
+  id: number;
+  estado: string | null;
+  total: string | number | null;
+  mesa?: MesaRow | MesaRow[] | null;
+  mesero?: UsuarioRow | UsuarioRow[] | null;
 }
 
 interface IngredientRow {
@@ -133,6 +143,19 @@ export interface OrderPaymentResponse {
   fecha: string | null;
 }
 
+export interface PaymentHistoryRecord {
+  id: number;
+  orderId: number | null;
+  metodoPago: string;
+  monto: number;
+  cambio: number | null;
+  fecha: string | null;
+  orderEstado: string | null;
+  orderTotal: number | null;
+  mesaNumero: string | null;
+  meseroNombre: string | null;
+}
+
 export interface OrderResponse {
   id: number;
   mesaId: number | null;
@@ -154,6 +177,10 @@ export type OrdersListResponse =
 
 export type OrderSingleResponse =
   | { ok: true; order: OrderResponse }
+  | { ok: false; message: string };
+
+export type PaymentsHistoryResponse =
+  | { ok: true; pagos: PaymentHistoryRecord[] }
   | { ok: false; message: string };
 
 @Injectable()
@@ -218,6 +245,40 @@ export class OrdersService {
     return { ok: true, orders };
   }
 
+  async listPayments(): Promise<PaymentsHistoryResponse> {
+    const supabase = this.supabaseService.getClient();
+    const { data, error } = await supabase
+      .from("pagos")
+      .select(
+        `
+        id,
+        orden_id,
+        metodo_pago,
+        monto,
+        cambio,
+        fecha,
+        orden:ordenes (
+          id,
+          estado,
+          total,
+          mesa:mesas ( id, numero ),
+          mesero:usuarios ( id, nombre )
+        )
+      `,
+      )
+      .order("fecha", { ascending: false })
+      .order("id", { ascending: false });
+
+    if (error) {
+      return { ok: false, message: "No se pudieron obtener los pagos" };
+    }
+
+    const pagos = (data ?? []).map((row) =>
+      this.mapPaymentHistory(row as PagoRow),
+    );
+    return { ok: true, pagos };
+  }
+
   async getOrderById(orderId: number): Promise<OrderSingleResponse> {
     const supabase = this.supabaseService.getClient();
     const { data, error } = await supabase
@@ -271,7 +332,8 @@ export class OrdersService {
     if (!cajaAbierta) {
       return {
         ok: false,
-        message: "No se pueden crear órdenes sin una caja abierta. Por favor, abre la caja primero.",
+        message:
+          "No se pueden crear órdenes sin una caja abierta. Por favor, abre la caja primero.",
       };
     }
 
@@ -313,7 +375,7 @@ export class OrdersService {
 
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
-      supabase
+      supabase,
     );
     if (!detailResult.ok) {
       return detailResult;
@@ -323,7 +385,7 @@ export class OrdersService {
 
     const inventoryResult = await this.calculateInventoryAdjustments(
       itemsValidation.items,
-      supabase
+      supabase,
     );
 
     if (!inventoryResult.ok) {
@@ -390,7 +452,7 @@ export class OrdersService {
 
   async addItems(
     orderId: number,
-    dto: AddOrderItemsDto
+    dto: AddOrderItemsDto,
   ): Promise<OrderSingleResponse> {
     const itemsValidation = this.validateItems(dto.items);
     if (!itemsValidation.ok) {
@@ -431,7 +493,7 @@ export class OrdersService {
 
     const detailResult = await this.buildDetailPayload(
       itemsValidation.items,
-      supabase
+      supabase,
     );
     if (!detailResult.ok) {
       return detailResult;
@@ -439,14 +501,14 @@ export class OrdersService {
 
     const inventoryResult = await this.calculateInventoryAdjustments(
       itemsValidation.items,
-      supabase
+      supabase,
     );
     if (!inventoryResult.ok) {
       return inventoryResult;
     }
 
     const currentTotal = this.toCurrency(
-      this.normalizeDecimal(orderRow.total) ?? 0
+      this.normalizeDecimal(orderRow.total) ?? 0,
     );
     const newTotal = this.toCurrency(currentTotal + detailResult.total);
 
@@ -504,7 +566,7 @@ export class OrdersService {
 
   async updateOrderStatus(
     orderId: number,
-    dto: UpdateOrderStatusDto
+    dto: UpdateOrderStatusDto,
   ): Promise<OrderSingleResponse> {
     const normalizedStatus = this.normalizeStatus(dto.estado);
     if (!normalizedStatus) {
@@ -528,7 +590,7 @@ export class OrdersService {
 
   async registerPayment(
     orderId: number,
-    dto: RegisterPaymentDto
+    dto: RegisterPaymentDto,
   ): Promise<OrderSingleResponse> {
     const metodoPago = this.normalizePaymentMethod(dto.metodo_pago);
     if (!metodoPago) {
@@ -587,8 +649,10 @@ export class OrdersService {
       return { ok: false, message: "No se pudo registrar el pago" };
     }
 
-    // Registrar ingreso en caja (si hay caja abierta)
-    await this.registerPaymentInCaja(orderId, monto, metodoPago, supabase);
+    // Registrar ingreso en caja solo para pagos en efectivo
+    if (metodoPago === "Efectivo") {
+      await this.registerPaymentInCaja(orderId, monto, metodoPago, supabase);
+    }
 
     // Verificar si la orden debe marcarse como pagada
     const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);
@@ -618,29 +682,36 @@ export class OrdersService {
   ): Promise<void> {
     try {
       // Buscar caja abierta
-      const { data: cajaAbierta } = await supabase
+      const cajaResult = await supabase
         .from("caja")
         .select("id")
         .is("cerrado_en", null)
         .order("abierto_en", { ascending: false })
         .limit(1)
         .maybeSingle();
+      type CajaAbiertaRow = { id: number };
+      const cajaAbierta = cajaResult.data as CajaAbiertaRow | null;
 
       if (!cajaAbierta) {
-        console.warn(`Pago de orden #${orderId} registrado, pero no hay caja abierta para registrar el ingreso`);
+        console.warn(
+          `Pago de orden #${orderId} registrado, pero no hay caja abierta para registrar el ingreso`,
+        );
         return;
       }
 
       // Obtener el pago recién insertado para ver si hubo cambio
-      const { data: pagoData } = await supabase
+      const pagoResult = await supabase
         .from("pagos")
         .select("cambio")
         .eq("orden_id", orderId)
         .order("fecha", { ascending: false })
         .limit(1)
         .single();
-
-      const cambio = pagoData?.cambio ? Number(pagoData.cambio) : 0;
+      type PagoCambioRow = { cambio: string | number | null };
+      const pagoData = pagoResult.data as PagoCambioRow | null;
+      const cambio = pagoData?.cambio
+        ? this.toCurrency(this.normalizeDecimal(pagoData.cambio))
+        : 0;
 
       // Registrar el monto completo como ingreso
       await supabase.from("transacciones_caja").insert({
@@ -658,9 +729,13 @@ export class OrdersService {
           monto: this.toCurrency(cambio),
           descripcion: `Cambio devuelto - Orden #${orderId}`,
         });
-        console.log(`Ingreso: $${monto}, Cambio devuelto: $${cambio}, Neto en caja: $${monto - cambio} (Orden #${orderId})`);
+        console.log(
+          `Ingreso: $${monto}, Cambio devuelto: $${cambio}, Neto en caja: $${monto - cambio} (Orden #${orderId})`,
+        );
       } else {
-        console.log(`Ingreso registrado en caja #${cajaAbierta.id} por orden #${orderId}: $${monto}`);
+        console.log(
+          `Ingreso registrado en caja #${cajaAbierta.id} por orden #${orderId}: $${monto}`,
+        );
       }
     } catch (error) {
       console.error("Error al registrar ingreso en caja:", error);
@@ -670,7 +745,7 @@ export class OrdersService {
 
   private async calculateInventoryAdjustments(
     items: NormalizedOrderItem[],
-    supabase: SupabaseClient
+    supabase: SupabaseClient,
   ): Promise<
     { ok: true; updates: InventoryUpdateRow[] } | { ok: false; message: string }
   > {
@@ -688,7 +763,7 @@ export class OrdersService {
         producto_id,
         cantidad,
         producto:productos ( id, nombre )
-      `
+      `,
       )
       .in("platillo_id", platilloIds);
 
@@ -700,7 +775,7 @@ export class OrdersService {
     }
 
     const quantityByPlatillo = new Map(
-      items.map((item) => [item.platilloId, item.cantidad])
+      items.map((item) => [item.platilloId, item.cantidad]),
     );
 
     const consumption = new Map<
@@ -762,7 +837,7 @@ export class OrdersService {
       }
 
       const disponible = this.normalizeDecimal(
-        inventoryRow.cantidad_disponible
+        inventoryRow.cantidad_disponible,
       );
       const restante = disponible - info.required;
       if (restante < 0) {
@@ -784,7 +859,7 @@ export class OrdersService {
 
   private async buildDetailPayload(
     items: NormalizedOrderItem[],
-    supabase: SupabaseClient
+    supabase: SupabaseClient,
   ): Promise<
     | { ok: true; detailPayload: DetailInsertRow[]; total: number }
     | { ok: false; message: string }
@@ -846,7 +921,7 @@ export class OrdersService {
 
   private async deleteOrderDetails(
     detailIds: number[],
-    supabase: SupabaseClient
+    supabase: SupabaseClient,
   ) {
     if (!detailIds.length) return;
     await supabase.from("detalle_orden").delete().in("id", detailIds);
@@ -857,7 +932,7 @@ export class OrdersService {
    */
   async removeItem(
     orderId: number,
-    detailId: number
+    detailId: number,
   ): Promise<OrderSingleResponse> {
     const supabase = this.supabaseService.getClient();
 
@@ -920,7 +995,7 @@ export class OrdersService {
 
     // Update order total
     const currentTotal = this.toCurrency(
-      this.normalizeDecimal(orderRow.total) ?? 0
+      this.normalizeDecimal(orderRow.total) ?? 0,
     );
     const newTotal = this.toCurrency(currentTotal - subtotal);
     const { error: totalError } = await supabase
@@ -954,13 +1029,15 @@ export class OrdersService {
         const restore = this.toQuantity(unitQty * cantidad);
 
         // fetch existing inventory row
-        const { data: invRows } = await supabase
+        const inventoryResult = await supabase
           .from("inventario")
           .select("id, producto_id, cantidad_disponible")
           .eq("producto_id", productoId)
           .maybeSingle();
+        type InventarioRow = { cantidad_disponible: string | number | null };
+        const invRow = inventoryResult.data as InventarioRow | null;
         const existingQty = this.normalizeDecimal(
-          invRows?.cantidad_disponible ?? 0
+          invRow?.cantidad_disponible ?? 0,
         );
         const newQty = this.toQuantity(existingQty + restore);
         updates.push({ producto_id: productoId, cantidad_disponible: newQty });
@@ -994,7 +1071,7 @@ export class OrdersService {
 
     const total = this.toCurrency(this.normalizeDecimal(record.total) ?? 0);
     const totalPagado = this.toCurrency(
-      pagos.reduce((acc, pago) => acc + pago.monto, 0)
+      pagos.reduce((acc, pago) => acc + pago.monto, 0),
     );
     const saldoPendiente = this.toCurrency(total - totalPagado);
 
@@ -1033,6 +1110,29 @@ export class OrdersService {
       monto: this.toCurrency(this.normalizeDecimal(row.monto) ?? 0),
       cambio: row.cambio !== null ? this.toCurrency(row.cambio) : null,
       fecha: row.fecha ?? null,
+    };
+  }
+
+  private mapPaymentHistory(row: PagoRow): PaymentHistoryRecord {
+    const order = this.extractSingle(row.orden);
+    const mesa = order ? this.extractSingle(order.mesa) : null;
+    const mesero = order ? this.extractSingle(order.mesero) : null;
+    const cambio =
+      row.cambio !== null && row.cambio !== undefined
+        ? this.toCurrency(row.cambio)
+        : null;
+
+    return {
+      id: row.id,
+      orderId: row.orden_id ?? order?.id ?? null,
+      metodoPago: row.metodo_pago,
+      monto: this.toCurrency(row.monto),
+      cambio,
+      fecha: row.fecha ?? null,
+      orderEstado: order?.estado ?? null,
+      orderTotal: order ? this.toCurrency(order.total) : null,
+      mesaNumero: mesa?.numero ?? null,
+      meseroNombre: mesero?.nombre ?? null,
     };
   }
 
@@ -1094,7 +1194,7 @@ export class OrdersService {
   }
 
   private normalizeNumericId(
-    input?: number | string | null
+    input?: number | string | null,
   ): number | null | undefined {
     if (input === undefined) return undefined;
     if (input === null) return null;
@@ -1113,7 +1213,7 @@ export class OrdersService {
   }
 
   private normalizeInteger(
-    value: string | number | null | undefined
+    value: string | number | null | undefined,
   ): number | null {
     if (value === null || value === undefined) return null;
     const parsed = Number(value);
@@ -1133,7 +1233,7 @@ export class OrdersService {
 
   private async rollbackOrder(
     orderId: number,
-    supabase: SupabaseClient
+    supabase: SupabaseClient,
   ): Promise<void> {
     try {
       await supabase.from("ordenes").delete().eq("id", orderId);
