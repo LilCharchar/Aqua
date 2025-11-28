@@ -1,16 +1,6 @@
 import { useEffect, useState } from "react";
 
-// Usamos un acceso seguro a import.meta para evitar errores en entornos ES2015
-const getApiUrl = () => {
-  try {
-    // @ts-ignore
-    return (import.meta as any)?.env?.VITE_API_URL ?? "/api";
-  } catch {
-    return "/api";
-  }
-};
-
-const API_URL = getApiUrl();
+const API_URL = "/api";
 
 type OrderModalProps = {
   isOpen: boolean;
