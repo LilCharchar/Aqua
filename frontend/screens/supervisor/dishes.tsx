@@ -12,7 +12,6 @@ import { IngredientsEditor, createIngredientRow, type IngredientInput, type Prod
 
 type SupervisorDishesProps = {
   user: User;
-  logout: () => void;
 };
 
 type DishIngredient = {
@@ -54,7 +53,7 @@ const EMPTY_DISH: Dish = {
 
 const API_URL = "/api";
 
-export function Dishes({ user, logout }: SupervisorDishesProps) {
+export function Dishes({ user }: SupervisorDishesProps) {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [dishToEdit, setDishToEdit] = useState<Dish>(EMPTY_DISH);
@@ -127,10 +126,10 @@ export function Dishes({ user, logout }: SupervisorDishesProps) {
   const openEditFromInfoModal = () => {
     if (!selectedDish) return;
 
-    const inputs: IngredientInput[] = selectedDish.ingredientes.map(ing => ({
-      key: `${ing.id}-${Date.now()}`, // Unique key
-      productoId: ing.productoId?.toString() ?? "",
-      cantidad: ing.cantidad.toString()
+    const inputs: IngredientInput[] = selectedDish.ingredientes.map((ing) => ({
+      key: `${ing.id}-${Date.now()}`,
+      productoId: ing.productoId,
+      cantidad: ing.cantidad.toString(),
     }));
 
     if (inputs.length === 0) {

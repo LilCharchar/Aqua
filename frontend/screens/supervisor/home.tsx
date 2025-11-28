@@ -3,10 +3,9 @@ import Separator from "../../src/components/separator";
 
 type SupervisorHomeProps = {
   user: User;
-  logout: () => void;
 };
 
-export function Home({ user, logout }: SupervisorHomeProps) {
+export function Home({ user }: SupervisorHomeProps) {
   return (
     <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
         <div className="m-10">

@@ -3,10 +3,9 @@ import Separator from "../../src/components/separator";
 
 type VentasHomeProps = {
   user: User;
-  logout: () => void;
 };
 
-export function Ventas({ user, logout }: VentasHomeProps) {
+export function Ventas({ user }: VentasHomeProps) {
   return (
         <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
         <div className="m-10">

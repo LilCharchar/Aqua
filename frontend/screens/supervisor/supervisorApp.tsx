@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 import Sidebar, { type NavItem } from '../../src/components/ui/Sidebar.tsx';
 import type { User } from "../types";
 import {Inventory}  from './inventory.tsx'; 
@@ -36,20 +36,20 @@ export default function SupervisorApp({user, logout}: UserProps) {
   const renderView = () => {
     switch (currentView) {
       case 'home':
-        return <Home user={user} logout={logout}/>; 
+        return <Home user={user} />;
       case 'dashboard':
-        return <Dashboard user={user} logout={logout}/>;
+        return <Dashboard user={user} />;
       case 'inventory':
         // Renderiza el componente de inventario que modificamos
         return <Inventory user={user} logout={logout}/>; 
       case 'dishes':
-        return <Dishes user={user} logout={logout}/>;
+        return <Dishes user={user} />;
       case 'orders':
         return <Orders user={user} logout={logout}/>;
       case 'ventas':
-        return <Ventas user={user} logout={logout}/>;
+        return <Ventas user={user} />;
       default:
-        return <Home user={user} logout={logout}/>;
+        return <Home user={user} />;
     }
   };
 

@@ -7,7 +7,6 @@ type ModalProps = {
   children: React.ReactNode;
   width?: string;
   closeOnBackdrop?: boolean;
-  contentClassName?: string;
 };
 
 const Modal: React.FC<ModalProps> = ({
@@ -17,7 +16,6 @@ const Modal: React.FC<ModalProps> = ({
   children,
   width = "max-w-2xl",
   closeOnBackdrop = true,
-  contentClassName = "",
 }) => {
   if (!isOpen) return null;
   return (

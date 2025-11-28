@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 // Usamos un acceso seguro a import.meta para evitar errores en entornos ES2015
 const getApiUrl = () => {
