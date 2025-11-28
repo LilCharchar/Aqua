@@ -261,6 +261,70 @@ describe("OrdersService", () => {
     });
   });
 
+  describe("listPayments", () => {
+    it("devuelve el historial normalizado con datos de la orden", async () => {
+      const rows = [
+        {
+          id: 10,
+          orden_id: 5,
+          metodo_pago: "Efectivo",
+          monto: "120.5",
+          cambio: "20.5",
+          fecha: "2025-01-01T10:00:00Z",
+          orden: [
+            {
+              id: 5,
+              estado: "Pagada",
+              total: "100.25",
+              mesa: [{ id: 2, numero: "Mesa 5" }],
+              mesero: [{ id: 9, nombre: "Laura" }],
+            },
+          ],
+        },
+      ];
+      fromMock.mockImplementationOnce(() =>
+        createListOrdersBuilder({ data: rows, error: null }),
+      );
+
+      const result = await ordersService.listPayments();
+
+      expect(result).toEqual({
+        ok: true,
+        pagos: [
+          {
+            id: 10,
+            orderId: 5,
+            metodoPago: "Efectivo",
+            monto: 120.5,
+            cambio: 20.5,
+            fecha: "2025-01-01T10:00:00Z",
+            orderEstado: "Pagada",
+            orderTotal: 100.25,
+            mesaNumero: "Mesa 5",
+            meseroNombre: "Laura",
+          },
+        ],
+      });
+      expect(fromMock).toHaveBeenCalledWith("pagos");
+    });
+
+    it("propaga el error si supabase falla", async () => {
+      fromMock.mockImplementationOnce(() =>
+        createListOrdersBuilder({
+          data: null,
+          error: new Error("pagos-error"),
+        }),
+      );
+
+      const result = await ordersService.listPayments();
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pudieron obtener los pagos",
+      });
+    });
+  });
+
   describe("createOrder", () => {
     it("valida que exista al menos un platillo", async () => {
       const dto: CreateOrderDto = {
