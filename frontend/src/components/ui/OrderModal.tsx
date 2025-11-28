@@ -612,9 +612,7 @@ export default function OrderModal({
                   <button
                     onClick={deleteOrder}
                     className="px-4 py-2 text-sm text-[var(--warning)] hover:bg-red-900/20 rounded-xl transition"
-                  >
-                    Eliminar Orden
-                  </button>
+                  ></button>
                   <button
                     onClick={() => {
                       setPaymentAmount(String(total));
