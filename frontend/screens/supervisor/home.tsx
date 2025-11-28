@@ -7,9 +7,9 @@ import Separator from "../../src/components/separator";
 
 type SupervisorHomeProps = {
   user: User;
+  logout?: () => void;
 };
 
-<<<<<<< HEAD
 type CajaTransaccion = {
   id: number;
   tipo: "Ingreso" | "Egreso";
@@ -82,13 +82,12 @@ const OpenCajaForm = ({ onOpen, isLoading }: { onOpen: (monto: number) => void, 
     }
   };
 
-=======
-export function Home({ user }: SupervisorHomeProps) {
->>>>>>> 972cb1eaac97c60e707ac679533e8ef2198b3b30
   return (
     <div className="max-w-md mx-auto mt-10 p-8">
       <div className="text-center mb-6">
-        <h3 className="text-xl manrope-bold text-[var(--text-primary)] ">Abrir Caja (Efectivo)</h3>
+        <h3 className="text-xl manrope-bold text-[var(--text-primary)] ">
+          Abrir Caja (Efectivo)
+        </h3>
         <p className="text-sm text-[var(--text-secondary)] manrope-light mt-1">
           Ingresa la base de efectivo inicial para este turno.
         </p>
@@ -98,8 +97,8 @@ export function Home({ user }: SupervisorHomeProps) {
         <div>
           <div className="relative">
             <span className="absolute left-3 top-3 text-gray-400">$</span>
-            <input 
-              type="number" 
+            <input
+              type="number"
               value={monto}
               onChange={(e) => setMonto(e.target.value)}
               placeholder="0"
@@ -109,9 +108,9 @@ export function Home({ user }: SupervisorHomeProps) {
             />
           </div>
         </div>
-        <Button 
-          disabled={isLoading} 
-          className="w-full py-3  transition-transform active:scale-95"
+        <Button
+          disabled={isLoading}
+          className="w-full py-3 transition-transform active:scale-95"
         >
           {isLoading ? "Abriendo..." : "Abrir Caja"}
         </Button>

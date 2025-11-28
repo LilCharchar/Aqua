@@ -74,17 +74,17 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)] p-8">
-      <div className="m-4">
+    <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
+      <div className="m-14 ml-20">
         <div className="flex items-center gap-4 mb-2">
           <img src={logo} alt="Logo" className="h-12 w-auto" />
           <h1 className="text-2xl manrope-bold">{user?.nombre ?? "—"}</h1>
-          <span className="text-sm ml-auto">Mesero</span>
+          <h2 className="text-sm ml-auto">Mesero</h2>
         </div>
         <Separator />
       </div>
-      <div className="mx-4 flex items-center justify-between flex-wrap gap-3">
-        <span className="text-3xl manrope-bold">Ordenes</span>
+      <div className="flex items-center justify-between gap-4 flex-wrap px-6 md:px-20">
+        <span className="text-3xl manrope-bold">Órdenes</span>
         <button
           onClick={fetchOrders}
           disabled={loading}
@@ -95,7 +95,7 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
         </button>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 px-6 md:px-20 pb-10">
         {loading && (
           <p className="text-sm text-slate-400">Cargando órdenes...</p>
         )}
@@ -128,7 +128,7 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
         </div>
       </div>
 
-      <div className="mt-auto flex justify-end items-center gap-4 mr-10">
+      <div className="mt-auto flex justify-end items-center gap-4 mr-10 mb-6">
         <button
           className="hover:scale-105 transition-transform duration-200 text-sm"
           onClick={logout}
@@ -139,7 +139,7 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
 
       <OrderModal
         isOpen={showCreate}
-        userId={user?.id}
+        userId={user?.userId ?? user?.id}
         userName={user?.nombre}
         lockMesero
         onClose={() => {
@@ -151,7 +151,7 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
       <OrderModal
         isOpen={!!editOrderId}
         orderId={editOrderId ?? undefined}
-        userId={user?.id}
+        userId={user?.userId ?? user?.id}
         userName={user?.nombre}
         lockMesero
         onClose={() => setEditOrderId(null)}

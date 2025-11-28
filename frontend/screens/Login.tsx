@@ -47,8 +47,13 @@ function Login() {
 
       if (data?.ok) {
         if (typeof data.rol === "number") {
+          const resolvedId =
+            (typeof data.userId === "string" && data.userId) ||
+            (typeof data.id === "string" && data.id) ||
+            undefined;
           const nextUser: User = {
-            id: data.userId,
+            id: resolvedId,
+            userId: resolvedId,
             nombre: data.nombre,
             rol: data.rol,
           };

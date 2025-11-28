@@ -87,7 +87,8 @@ export default function OrderModal({
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
-          if (parsed.id) setMeseroId(parsed.id);
+          const storedId = parsed?.id ?? parsed?.userId;
+          if (storedId) setMeseroId(String(storedId));
         }
       } catch (e) {
         // Ignorar error de parsing
