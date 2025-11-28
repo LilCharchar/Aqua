@@ -219,6 +219,20 @@ export class CajaService {
     }
   }
 
+  async getLastMontoFinal(): Promise<
+    | { ok: true; monto: number }
+    | { ok: false; message: string }
+  > {
+    try {
+      const supabase = this.supabaseService.getClient();
+      const monto = await this.getPreviousCajaMontoFinal(supabase);
+      return { ok: true, monto };
+    } catch (error: unknown) {
+      console.error("Unexpected error in getLastMontoFinal:", error);
+      return { ok: false, message: this.getUnknownErrorMessage(error) };
+    }
+  }
+
   async listCajas(): Promise<CajasListResponse> {
     try {
       const supabase = this.supabaseService.getClient();

@@ -23,6 +23,7 @@ type OrderSummary = {
   mesaNumero?: string | null;
   items: OrderItem[];
   total?: number;
+  meseroId?: string | number | null;
 };
 
 const API_URL = "/api";
@@ -43,6 +44,7 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
     setLoading(true);
     setError("");
     try {
+      const currentUserId = user?.userId ?? user?.id ?? null;
       const res = await fetch(`${API_URL}/orders`);
       const data = await res.json();
       if (!res.ok || data?.ok === false)
@@ -50,22 +52,46 @@ export function Orders({ user, logout }: MeseroOrdersProps) {
       // backend might return { orders: [...] } or { data: [...] }
       const list = data.orders ?? data.data ?? [];
       // map to our summary shape conservatively
-      const mapped: OrderSummary[] = (list ?? []).map((o: any) => ({
-        id: o.id,
-        mesaNumero:
-          o.mesa_numero ??
-          o.mesaNumero ??
-          o.mesa?.numero ??
-          String(o.mesa_id ?? ""),
-        items: (o.items ?? o.items_order ?? []).map((it: any) => ({
-          id: it.id,
-          platilloNombre: it.platillo_nombre ?? it.platilloNombre ?? it.nombre,
-          cantidad: it.cantidad,
-          subtotal: it.subtotal ?? it.precio_subtotal,
-        })),
-        total: o.total ?? o.total_amount ?? 0,
-      }));
-      setOrders(mapped);
+      const mapped: OrderSummary[] = (list ?? []).map((o: any) => {
+        const rawMesero =
+          o.mesero ?? o.meseros ?? o.mesero_usuario ?? o.meseroUsuario ?? null;
+        const resolvedMesero =
+          Array.isArray(rawMesero) && rawMesero.length > 0
+            ? rawMesero[0]
+            : rawMesero;
+        return {
+          id: o.id,
+          mesaNumero:
+            o.mesa_numero ??
+            o.mesaNumero ??
+            o.mesa?.numero ??
+            String(o.mesa_id ?? ""),
+          items: (o.items ?? o.items_order ?? []).map((it: any) => ({
+            id: it.id,
+            platilloNombre:
+              it.platillo_nombre ?? it.platilloNombre ?? it.nombre,
+            cantidad: it.cantidad,
+            subtotal: it.subtotal ?? it.precio_subtotal,
+          })),
+          total: o.total ?? o.total_amount ?? 0,
+          meseroId:
+            o.mesero_id ??
+            o.meseroId ??
+            resolvedMesero?.id ??
+            resolvedMesero?.userId ??
+            null,
+        };
+      });
+      const filtered =
+        currentUserId === null
+          ? mapped
+          : mapped.filter(
+              (order) =>
+                order.meseroId !== undefined &&
+                order.meseroId !== null &&
+                String(order.meseroId) === String(currentUserId)
+            );
+      setOrders(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

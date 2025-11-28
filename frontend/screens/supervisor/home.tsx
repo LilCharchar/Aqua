@@ -7,7 +7,6 @@ import Separator from "../../src/components/separator";
 
 type SupervisorHomeProps = {
   user: User;
-  logout?: () => void;
 };
 
 type CajaTransaccion = {
@@ -69,8 +68,22 @@ function formatCurrency(amount: number) {
 // --- SUB-COMPONENTES ---
 
 // 1. Formulario para Abrir Caja
-const OpenCajaForm = ({ onOpen, isLoading }: { onOpen: (monto: number) => void, isLoading: boolean }) => {
-  const [monto, setMonto] = useState("");
+const OpenCajaForm = ({
+  onOpen,
+  isLoading,
+  defaultMonto,
+}: {
+  onOpen: (monto: number) => void;
+  isLoading: boolean;
+  defaultMonto: number;
+}) => {
+  const [monto, setMonto] = useState(
+    defaultMonto ? String(defaultMonto) : "",
+  );
+
+  useEffect(() => {
+    setMonto(defaultMonto ? String(defaultMonto) : "");
+  }, [defaultMonto]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +103,11 @@ const OpenCajaForm = ({ onOpen, isLoading }: { onOpen: (monto: number) => void, 
         </h3>
         <p className="text-sm text-[var(--text-secondary)] manrope-light mt-1">
           Ingresa la base de efectivo inicial para este turno.
+          {defaultMonto > 0 && (
+            <span className="block mt-1 text-xs text-[var(--text-secondary)]">
+              Último cierre: {formatCurrency(defaultMonto)}
+            </span>
+          )}
         </p>
       </div>
 
@@ -257,10 +275,23 @@ if(window.confirm(`¿Confirmar cierre con ${formatCurrency(montoFinal)} en EFECT
 };
 // --- COMPONENTE PRINCIPAL (CONTAINER) ---
 
-export function Home({ user, logout }: SupervisorHomeProps) {
+export function Home({ user }: SupervisorHomeProps) {
   const [caja, setCaja] = useState<CajaResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [defaultMontoInicial, setDefaultMontoInicial] = useState(0);
+
+  const fetchPreviousMonto = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/last/final`);
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        setDefaultMontoInicial(Number(data.monto) || 0);
+      }
+    } catch (err) {
+      console.warn("No se pudo obtener el último monto final", err);
+    }
+  }, []);
 
   // 1. Cargar estado inicial
   const fetchCurrentCaja = useCallback(async () => {
@@ -275,6 +306,7 @@ export function Home({ user, logout }: SupervisorHomeProps) {
         } else {
             if (data.message && data.message.includes("No hay caja abierta")) {
                 setCaja(null);
+                await fetchPreviousMonto();
             } else {
                 setError(data.message);
             }
@@ -285,11 +317,15 @@ export function Home({ user, logout }: SupervisorHomeProps) {
     } finally {
         setIsLoading(false);
     }
-  }, []);
+  }, [fetchPreviousMonto]);
 
   useEffect(() => {
     fetchCurrentCaja();
   }, [fetchCurrentCaja]);
+
+  useEffect(() => {
+    fetchPreviousMonto();
+  }, [fetchPreviousMonto]);
 
   // 2. Manejar Apertura
   const handleOpenCaja = async (montoInicial: number) => {
@@ -397,7 +433,8 @@ export function Home({ user, logout }: SupervisorHomeProps) {
                 // VISTA: CAJA CERRADA (FORMULARIO)
                 <OpenCajaForm 
                     onOpen={handleOpenCaja} 
-                    isLoading={isLoading} 
+                    isLoading={isLoading}
+                    defaultMonto={defaultMontoInicial}
                 />
             )}
         </div>
