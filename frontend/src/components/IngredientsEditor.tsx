@@ -1,5 +1,7 @@
 import React, { useId } from "react";
 import Button from "./ui/button";
+import { Plus } from 'lucide-react' ;
+import { Trash } from 'lucide-react';
 
 export interface ProductOption {
     id: number;
@@ -9,7 +11,7 @@ export interface ProductOption {
 
 export interface IngredientInput {
     key: string;
-    productoId: string;
+    productoId: number | null ;
     cantidad: string;
 }
 
@@ -20,11 +22,10 @@ interface IngredientsEditorProps {
 }
 
 export function createIngredientRow(): IngredientInput {
-    const random = typeof crypto !== "undefined" && "randomUUID" in crypto;
-    const key = random
-        ? (crypto as Crypto).randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-    return { key, productoId: "", cantidad: "" };
+    return { key:  crypto.randomUUID(),
+            productoId: null, 
+            cantidad: "" 
+        };
 }
 
 export function IngredientsEditor({ items, onChange, products }: IngredientsEditorProps) {
@@ -47,55 +48,75 @@ export function IngredientsEditor({ items, onChange, products }: IngredientsEdit
     const addItem = () => {
         onChange([...items, createIngredientRow()]);
     };
+    
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-[var(--text-primary)]">
-                    Ingredientes
-                </h4>
-                <Button
-                    type="button"
-                    onClick={addItem}
-                    className="text-xs px-3 py-1"
-                >
-                    Agregar ingrediente
-                </Button>
-            </div>
-            {items.map((item) => (
-                <div key={item.key} className="flex flex-wrap gap-2 items-center">
+                {items.map((item) => {
+                    const selectedProduct = products.find((p) => p.id === item.productoId
+                );
+                    return(
+                <div key={item.key} className="flex flex-wrap gap-2 items-center justify-center">
+                        <select
+                            className="flex-1 min-w-[120px] p-2 bg-[var(--secondary)] border border-[var(--text-primary)] rounded-lg manrope-light"
+                            value={item.productoId ?? ""}
+                            onChange={(e) => 
+                                updateItem(item.key, { productoId: Number(e.target.value) || null })
+                            }
+                        >
+                            <option value="">Seleccionar producto...</option>
+
+                            {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.nombre} ({p.unidad})
+                                </option>
+                            ))}
+                        </select>
                     <input
-                        list={datalistId}
-                        className="flex-1 min-w-[120px] rounded bg-[var(--background-alt)] p-2 text-sm text-[var(--text-primary)]"
-                        placeholder="ID producto"
-                        value={item.productoId}
-                        onChange={(e) =>
-                            updateItem(item.key, { productoId: e.target.value })
-                        }
-                    />
-                    <input
-                        className="w-32 rounded bg-[var(--background-alt)] p-2 text-sm text-[var(--text-primary)]"
-                        placeholder="Cantidad"
+                        className="w-32 p-2 bg-[var(--secondary)] border border-bg-[var(--text-primary)] rounded-lg manrope-light"
+                        placeholder={"Cantidad"}
                         value={item.cantidad}
                         onChange={(e) =>
                             updateItem(item.key, { cantidad: e.target.value })
                         }
                     />
-                    <Button
+                    
+                    <button
                         type="button"
                         onClick={() => removeItem(item.key)}
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white"
                     >
-                        Quitar
-                    </Button>
+                        <Trash className="hover:text-[var(--warning)]"/>
+                    </button>
                 </div>
-            ))}
+                    );
+                })}
+
+                <div className="flex justify-end mt-4" >
+                    <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex items-center justify-center 
+                    shadow-2xl 
+                    bg-[var(--primary)]/80
+                    p-1
+                    text-[var(--options)] text-sm rounded-lg  
+                    cursor-pointer 
+                    manrope-regular 
+                    transition duration-150 ease-in-out 
+                    hover:shadow-inner hover:shadow-black/20 hover:scale-[0.99] active:scale-[0.98]
+                    gap-0.5"
+                >
+                    <Plus  size={16}/> Añadir ingrediente
+                </button>
+                </div>
+                
+
             <datalist id={datalistId}>
                 {products.map((product) => (
                     <option
                         key={product.id}
-                        value={product.id}
-                    >{`${product.nombre} (${product.unidad})`}</option>
+                        value={product.nombre}
+                    >{` (${product.unidad})`}</option>
                 ))}
             </datalist>
         </div>

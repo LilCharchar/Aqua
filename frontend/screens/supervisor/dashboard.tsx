@@ -23,9 +23,7 @@ export function Dashboard({ user, logout }: SupervisorDashboardProps) {
           <Separator />
         </div>
       <div className="min-h-screen p-8">
-        <MetabaseDashboard url="http://metabase-production-fbed.up.railway.app/public/question/6a63da24-c75c-4449-83aa-6ccccb489bb5"/>
-        <MetabaseDashboard url="http://metabase-production-fbed.up.railway.app/public/question/75057140-df95-4cdb-aa7a-a76dd40a7b42"/>
-        <MetabaseDashboard url="http://metabase-production-fbed.up.railway.app/public/dashboard/5dfb104b-42aa-4588-87e9-28fb39dd1578"/>
+        <MetabaseDashboard url="http://metabase-production-65c9.up.railway.app/public/dashboard/0c87ef7b-d668-4c32-a024-ab36f9487206"/>
 
 
       </div>

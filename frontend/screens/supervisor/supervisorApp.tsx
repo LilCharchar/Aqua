@@ -6,7 +6,7 @@ import Dashboard from './dashboard.tsx';
 import Dishes from './dishes.tsx';
 import Orders from './orders.tsx';
 import Home from './home.tsx';
-
+import Ventas from'./ventas.tsx';
 
 
 // Asume que este es el tipo de tu usuario
@@ -46,6 +46,8 @@ export default function SupervisorApp({user, logout}: UserProps) {
         return <Dishes user={user} logout={logout}/>;
       case 'orders':
         return <Orders user={user} logout={logout}/>;
+      case 'ventas':
+        return <Ventas user={user} logout={logout}/>;
       default:
         return <Home user={user} logout={logout}/>;
     }

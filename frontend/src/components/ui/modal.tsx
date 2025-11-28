@@ -35,9 +35,7 @@ const Modal: React.FC<ModalProps> = ({
         <div className="flex justify-center items-center mb-6">
           <h2 className="text-2xl manrope-bold">{title}</h2>
         </div>
-        <div className={`max-h-[70vh] overflow-y-auto ${contentClassName}`}>
-          {children}
-        </div>
+        <div className="max-h-[70vh] overflow-y-auto table-scroll-area-darker p-2">{children}</div>
       </div>
     </div>
   );

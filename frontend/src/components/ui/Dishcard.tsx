@@ -52,11 +52,11 @@ const DishCard: React.FC<DishCardProps> = ({
             {...props}
         >
             {/*Imagen plato*/}
-            <div className="w-24 h-24 sm:w-32 sm:h-32 -mt-16 mb-2 rounded-full overflow-hidden border-4 border-gray-800 shadow-xl z-10">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 -mt-16 mb-2 rounded-full overflow-hidden shadow-xl z-10">
 
                 <img src={imageURL}
                     alt={name}
-                    className={"object-cover w-full h-full"}
+                    className={"object-cover object-center w-full h-full"}
                     loading="lazy"
                 />
             </div>
