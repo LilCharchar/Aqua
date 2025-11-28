@@ -1,4 +1,5 @@
 import type { User } from "../types";
+import Orders from "./orders";
 
 type MeseroHomeProps = {
   user: User;
@@ -10,6 +11,8 @@ export function MeseroHome({ user, logout }: MeseroHomeProps) {
     <div>
       <h1>Mesero: {user.nombre}</h1>
       <button onClick={logout}>Cerrar sesión</button>
+
+      <Orders user={user} />
     </div>
   );
 }
