@@ -126,6 +126,27 @@ function createMesaUpdateBuilder() {
   return { update, eq };
 }
 
+function createCajaLookupBuilder(response: SingleResponse): {
+  select: jest.Mock;
+  is: jest.Mock;
+  order: jest.Mock;
+  limit: jest.Mock;
+  maybeSingle: jest.Mock;
+} {
+  const builder = {
+    select: jest.fn(),
+    is: jest.fn(),
+    order: jest.fn(),
+    limit: jest.fn(),
+    maybeSingle: jest.fn().mockResolvedValue(response),
+  };
+  builder.select.mockReturnValue(builder);
+  builder.is.mockReturnValue(builder);
+  builder.order.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+  return builder;
+}
+
 describe("OrdersService", () => {
   let ordersService: OrdersService;
   let supabaseService: { getClient: jest.Mock };
@@ -317,6 +338,10 @@ describe("OrdersService", () => {
         ],
       };
 
+      const cajaBuilder = createCajaLookupBuilder({
+        data: { id: 1 },
+        error: null,
+      });
       const platillosBuilder = createPlatillosBuilder({
         data: platillosRows,
         error: null,
@@ -349,6 +374,7 @@ describe("OrdersService", () => {
       });
 
       fromMock
+        .mockImplementationOnce(() => cajaBuilder) // from("caja").select().is().maybeSingle()
         .mockImplementationOnce(() => mesaLookupBuilder) // from("mesas").select().eq().maybeSingle()
         .mockImplementationOnce(() => meseroLookupBuilder) // from("usuarios").select().eq().maybeSingle()
         .mockImplementationOnce(() => platillosBuilder) // from("platillos").select().in()
@@ -449,6 +475,10 @@ describe("OrdersService", () => {
     });
 
     it("falla cuando no hay inventario suficiente", async () => {
+      const cajaBuilder = createCajaLookupBuilder({
+        data: { id: 1 },
+        error: null,
+      });
       const mesaLookupBuilder = createGetOrderBuilder({
         data: { id: 1, activa: true },
         error: null,
@@ -478,6 +508,7 @@ describe("OrdersService", () => {
       });
 
       fromMock
+        .mockImplementationOnce(() => cajaBuilder)
         .mockImplementationOnce(() => mesaLookupBuilder)
         .mockImplementationOnce(() => meseroLookupBuilder)
         .mockImplementationOnce(() => platillosBuilder)
@@ -495,7 +526,7 @@ describe("OrdersService", () => {
         ok: false,
         message: "No hay suficiente inventario para Camaron",
       });
-      expect(fromMock).toHaveBeenCalledTimes(5);
+      expect(fromMock).toHaveBeenCalledTimes(6);
     });
   });
 
@@ -688,6 +719,27 @@ describe("OrdersService", () => {
   });
 
   describe("registerPayment", () => {
+    let registerPaymentInCajaSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      registerPaymentInCajaSpy = jest
+        .spyOn(
+          ordersService as unknown as {
+            registerPaymentInCaja: (
+              orderId: number,
+              monto: number,
+              metodo: string,
+              supabase: unknown,
+            ) => Promise<void>;
+          },
+          "registerPaymentInCaja",
+        )
+        .mockResolvedValue();
+    });
+
+    afterEach(() => {
+      registerPaymentInCajaSpy.mockRestore();
+    });
     it("rechaza métodos de pago no soportados", async () => {
       const result = await ordersService.registerPayment(10, {
         metodo_pago: "Cheque",
