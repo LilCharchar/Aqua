@@ -7,9 +7,9 @@ import Separator from "../../src/components/separator";
 
 type SupervisorHomeProps = {
   user: User;
-  logout: () => void;
 };
 
+<<<<<<< HEAD
 type CajaTransaccion = {
   id: number;
   tipo: "Ingreso" | "Egreso";
@@ -82,6 +82,9 @@ const OpenCajaForm = ({ onOpen, isLoading }: { onOpen: (monto: number) => void, 
     }
   };
 
+=======
+export function Home({ user }: SupervisorHomeProps) {
+>>>>>>> 972cb1eaac97c60e707ac679533e8ef2198b3b30
   return (
     <div className="max-w-md mx-auto mt-10 p-8">
       <div className="text-center mb-6">

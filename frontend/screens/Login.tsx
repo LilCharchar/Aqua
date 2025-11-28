@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { User } from "./types";
 import { AdminHome } from "../screens/admin/adminHome";
 import { MeseroHome } from "../screens/mesero/meseroHome";
-import SupervisorApp from "./supervisor/SupervisorApp";
+import SupervisorApp from "./supervisor/supervisorApp";
 import WaveBackground from "../src/components/wave-background";
 import Input from "../src/components/ui/input";
 import Button from "../src/components/ui/button";

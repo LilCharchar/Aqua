@@ -1,7 +1,5 @@
-import React, { useId } from "react";
-import Button from "./ui/button";
-import { Plus } from 'lucide-react' ;
-import { Trash } from 'lucide-react';
+import { useId } from "react";
+import { Plus, Trash } from "lucide-react";
 
 export interface ProductOption {
     id: number;
@@ -53,8 +51,6 @@ export function IngredientsEditor({ items, onChange, products }: IngredientsEdit
     return (
         <div className="space-y-2">
                 {items.map((item) => {
-                    const selectedProduct = products.find((p) => p.id === item.productoId
-                );
                     return(
                 <div key={item.key} className="flex flex-wrap gap-2 items-center justify-center">
                         <select

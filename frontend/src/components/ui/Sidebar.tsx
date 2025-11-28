@@ -2,7 +2,7 @@ import React from 'react';
 import ordersIcon from "../../../assets/ordersIcon.png";
 import dashboardIcon from "../../../assets/dashboardIcon.svg";
 import logo from "../../../assets/logo.png";
-import inventoryIcon from "../../../assets/inventoryIcon.svg";
+import inventoryIcon from "../../../assets/InventoryIcon.svg";
 import dishesIcon from "../../../assets/dishesIcon.svg";
 import ventasIcon from "../../../assets/ventasIcon.png";
 import { Menu } from 'lucide-react'

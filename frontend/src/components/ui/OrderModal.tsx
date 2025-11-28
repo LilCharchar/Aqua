@@ -1,16 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-// Usamos un acceso seguro a import.meta para evitar errores en entornos ES2015
-const getApiUrl = () => {
-  try {
-    // @ts-ignore
-    return (import.meta as any)?.env?.VITE_API_URL ?? "/api";
-  } catch {
-    return "/api";
-  }
-};
-
-const API_URL = getApiUrl();
+const API_URL = "/api";
 
 type OrderModalProps = {
   isOpen: boolean;
@@ -622,9 +612,7 @@ export default function OrderModal({
                   <button
                     onClick={deleteOrder}
                     className="px-4 py-2 text-sm text-[var(--warning)] hover:bg-red-900/20 rounded-xl transition"
-                  >
-                    Eliminar Orden
-                  </button>
+                  ></button>
                   <button
                     onClick={() => {
                       setPaymentAmount(String(total));

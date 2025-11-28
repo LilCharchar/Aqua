@@ -5,9 +5,9 @@ import {Table, type Column} from "../../src/components/ui/table";
 
 type VentasHomeProps = {
   user: User;
-  logout: () => void;
 };
 
+<<<<<<< HEAD
 type PaymentOrder = {
     id: number,
     estado: string;
@@ -182,6 +182,9 @@ const PaymentHistory: React.FC = () => {
 
 
 export function Ventas({ user, logout }: VentasHomeProps) {
+=======
+export function Ventas({ user }: VentasHomeProps) {
+>>>>>>> 972cb1eaac97c60e707ac679533e8ef2198b3b30
   return (
         <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
         <div className="m-10">

@@ -1,6 +1,5 @@
 import type { User } from "../types";
-import { toast } from "sonner";
-import Button from "../../src/components/ui/button"
+import Orders from "./orders";
 
 type MeseroHomeProps = {
   user: User;
@@ -12,7 +11,12 @@ export function MeseroHome({ user, logout }: MeseroHomeProps) {
     <div>
       <h1>Mesero: {user.nombre}</h1>
       <button onClick={logout}>Cerrar sesión</button>
+<<<<<<< HEAD
       
+=======
+
+      <Orders user={user} />
+>>>>>>> 972cb1eaac97c60e707ac679533e8ef2198b3b30
     </div>
   );
 }

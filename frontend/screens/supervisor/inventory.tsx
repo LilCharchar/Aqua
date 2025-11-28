@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import type { InventoryCategory, InventoryProduct, User } from "../types";
 import Separator from "../../src/components/separator";
-import logo from "../../assets/logo.png";
 import Modal from "../../src/components/ui/modal";
 import Button from "../../src/components/ui/button";
 import Input from "../../src/components/ui/input";
@@ -438,13 +437,13 @@ export function Inventory({ user, logout }: InventoryProps) {
       {
         header: "Categoría",
         accessor: "categoriaNombre",
-        render: (v) => v ?? "Sin categoría",
+        render: (value) => (value != null ? String(value) : "Sin categoría"),
         width: "12%"
       },
       {
         header: "Descripción",
         accessor: "descripcion",
-        render: (v) => v ?? "Sin descripción",
+        render: (value) => (value != null ? String(value) : "Sin descripción"),
         width:"28%",
         cellClassName: "truncate"
       },

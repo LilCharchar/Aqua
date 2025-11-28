@@ -5,7 +5,7 @@ import OrderCard from "../../src/components/ui/OrderCard";
 import OrderModal from "../../src/components/ui/OrderModal";
 import Modal from "../../src/components/ui/modal";
 
-type SupervisorOrdersProps = {
+type MeseroOrdersProps = {
   user: User;
   logout: () => void;
 };
@@ -23,9 +23,9 @@ type OrderSummary = {
   total?: number;
 };
 
-const API_URL = "/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
-export function Orders({ user }: SupervisorOrdersProps) {
+export function Orders({ user }: MeseroOrdersProps) {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -77,9 +77,7 @@ export function Orders({ user }: SupervisorOrdersProps) {
         <div className="flex items-center gap-4">
           <span className="text-xl manrope-bold">{user?.nombre}</span>
           <div className="ml-auto">
-            <span className="text-s text-[var(--text-primary)]">
-              Supervisor
-            </span>
+            <span className="text-s text-[var(--text-primary)]">Mesero</span>
           </div>
         </div>
         <div className="flex items-center justify-center mt-4">
