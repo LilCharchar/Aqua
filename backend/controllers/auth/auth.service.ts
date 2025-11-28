@@ -1,29 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import * as bcrypt from "bcrypt";
 import { SupabaseService } from "../../src/supabase.service";
+import { ENV } from "../../src/config/env";
 import { CreateUserDto, LoginDto, UpdateUserDto } from "./auth.dto";
-
-type BcryptHash = (
-  data: string | Buffer,
-  saltOrRounds: string | number,
-) => Promise<string>;
-type BcryptCompare = (
-  data: string | Buffer,
-  encrypted: string,
-) => Promise<boolean>;
-
-interface BcryptModule {
-  hash: BcryptHash;
-  compare: BcryptCompare;
-}
-
-const bcryptModule = bcrypt as unknown as BcryptModule;
-const { hash: bcryptHash, compare: bcryptCompare } = bcryptModule;
 
 interface UsuarioPOS {
   id: string;
   correo: string;
-  contraseña: string;
   nombre: string | null;
   rol_id: number | null;
   activo: boolean;
@@ -41,8 +23,29 @@ export interface UserResponse {
 export class AuthService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  private isHashedPassword(password: string | null): boolean {
-    return Boolean(password?.startsWith("$2"));
+  private validatePassword(password: string) {
+    if (!password) {
+      return { ok: false, message: "La contraseña es obligatoria" };
+    }
+
+    if (password.length < 8) {
+      return {
+        ok: false,
+        message: "La contraseña debe tener al menos 8 caracteres",
+      };
+    }
+
+    const hasLetter = /[A-Za-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+
+    if (!hasLetter || !hasNumber) {
+      return {
+        ok: false,
+        message: "La contraseña debe incluir letras y números",
+      };
+    }
+
+    return { ok: true };
   }
 
   private buildUserResponse(user: UsuarioPOS): UserResponse {
@@ -55,12 +58,8 @@ export class AuthService {
     };
   }
 
-  private hashPassword(password: string) {
-    return bcryptHash(password, 10);
-  }
-
-  private comparePassword(password: string, hash: string) {
-    return bcryptCompare(password, hash);
+  private normalizeId(id: string) {
+    return id?.trim();
   }
 
   async getUsers() {
@@ -85,39 +84,29 @@ export class AuthService {
   async login(dto: LoginDto) {
     const supabase = this.supabaseService.getClient();
 
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select(
-        `
-        id,
-        correo,
-        contraseña,
-        nombre,
-        rol_id,
-        activo`,
-      )
-      .eq("correo", dto.correo)
-      .limit(1);
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: dto.correo,
+        password: dto.contraseña,
+      });
 
-    if (error || !data || data.length === 0) {
-      return { ok: false, message: "Usuario no encontrado" };
-    }
-
-    const user = data[0] as unknown as UsuarioPOS;
-
-    const storedPassword = user.contraseña ?? "";
-    const shouldUseHash = this.isHashedPassword(storedPassword);
-    const isValid = shouldUseHash
-      ? await this.comparePassword(dto.contraseña, storedPassword)
-      : storedPassword === dto.contraseña;
-
-    if (!isValid) {
+    if (authError || !authData?.user) {
       return { ok: false, message: "Credenciales inválidas" };
     }
 
-    if (!user.activo) {
-      return { ok: false, message: "Usuario desactivado" };
+    const { data: userRow, error: userError } = await supabase
+      .from("usuarios")
+      .select("id, nombre, correo, rol_id, activo")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    if (userError || !userRow) {
+      return { ok: false, message: "Usuario no encontrado" };
     }
+
+    const user = userRow as UsuarioPOS;
+
+    if (!user.activo) return { ok: false, message: "Usuario desactivado" };
 
     return {
       ok: true,
@@ -131,6 +120,9 @@ export class AuthService {
   async register(dto: CreateUserDto) {
     const supabase = this.supabaseService.getClient();
 
+    const passwordValidation = this.validatePassword(dto.contraseña);
+    if (!passwordValidation.ok) return passwordValidation;
+
     const { data: existing, error: findErr } = await supabase
       .from("usuarios")
       .select("id")
@@ -140,16 +132,34 @@ export class AuthService {
     if (findErr) return { ok: false, message: "Error verificando correo" };
     if (existing) return { ok: false, message: "Correo ya registrado" };
 
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+      {
+        email: dto.correo,
+        password: dto.contraseña,
+        options: {
+          emailRedirectTo: ENV.FRONTEND_ORIGIN,
+          data: { nombre: dto.nombre },
+        },
+      },
+    );
+
+    if (signUpError || !signUpData?.user) {
+      return {
+        ok: false,
+        message: signUpError?.message ?? "No se pudo registrar el usuario",
+      };
+    }
+
+    const authUserId = signUpData.user.id;
     const activo = dto.activo ?? true;
-    const hashedPassword = await this.hashPassword(dto.contraseña);
 
     const { data, error: insErr } = await supabase
       .from("usuarios")
       .insert([
         {
+          id: authUserId,
           nombre: dto.nombre,
           correo: dto.correo,
-          contraseña: hashedPassword,
           rol_id: dto.rol_id ?? null,
           activo,
         },
@@ -157,15 +167,18 @@ export class AuthService {
       .select("id, nombre, correo, rol_id, activo")
       .single();
 
-    const user = data as unknown as UsuarioPOS;
-
-    if (insErr || !user)
+    if (insErr || !data) {
+      await supabase.auth.admin.deleteUser(authUserId);
       return { ok: false, message: "No se pudo crear el usuario" };
+    }
+
+    const user = data as unknown as UsuarioPOS;
 
     return { ok: true, ...this.buildUserResponse(user) };
   }
 
   async updateUser(id: string, dto: UpdateUserDto) {
+    const userId = this.normalizeId(id);
     const supabase = this.supabaseService.getClient();
 
     const payload: Partial<UsuarioPOS> = {};
@@ -173,18 +186,60 @@ export class AuthService {
     if (dto.correo !== undefined) payload.correo = dto.correo;
     if (dto.rol_id !== undefined) payload.rol_id = dto.rol_id ?? null;
     if (dto.activo !== undefined) payload.activo = dto.activo;
-    if (dto.contraseña) {
-      payload.contraseña = await this.hashPassword(dto.contraseña);
+
+    const newPassword =
+      typeof dto.contraseña === "string" && dto.contraseña.length > 0
+        ? dto.contraseña
+        : null;
+
+    if (newPassword) {
+      const passwordValidation = this.validatePassword(newPassword);
+      if (!passwordValidation.ok) {
+        return passwordValidation;
+      }
     }
 
-    if (Object.keys(payload).length === 0) {
+    const hasUserChanges = Object.keys(payload).length > 0;
+
+    if (!hasUserChanges && !newPassword) {
       return { ok: false, message: "No hay cambios para aplicar" };
+    }
+
+    if (newPassword) {
+      const { error: pwdError } = await supabase.auth.admin.updateUserById(
+        userId,
+        {
+          password: newPassword,
+        },
+      );
+
+      if (pwdError) {
+        return {
+          ok: false,
+          message: pwdError.message ?? "No se pudo actualizar la contraseña",
+        };
+      }
+    }
+
+    if (!hasUserChanges) {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("id, nombre, correo, rol_id, activo")
+        .eq("id", userId)
+        .single();
+
+      if (error || !data) {
+        return { ok: false, message: "Usuario no encontrado" };
+      }
+
+      const user = data as unknown as UsuarioPOS;
+      return { ok: true, ...this.buildUserResponse(user) };
     }
 
     const { data, error } = await supabase
       .from("usuarios")
       .update(payload)
-      .eq("id", id)
+      .eq("id", userId)
       .select("id, nombre, correo, rol_id, activo")
       .single();
 

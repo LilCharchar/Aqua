@@ -71,6 +71,7 @@ export function Usuarios({ onReady }: UsuariosProps = {}) {
   const [editError, setEditError] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [rowActionId, setRowActionId] = useState<string | null>(null);
+  
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<number | "">("");

@@ -120,6 +120,33 @@ function createOrderTotalUpdateBuilder(error: Error | null = null) {
   return { update, payloads };
 }
 
+function createMesaUpdateBuilder() {
+  const eq = jest.fn().mockResolvedValue({ error: null, data: null });
+  const update = jest.fn().mockReturnValue({ eq });
+  return { update, eq };
+}
+
+function createCajaLookupBuilder(response: SingleResponse): {
+  select: jest.Mock;
+  is: jest.Mock;
+  order: jest.Mock;
+  limit: jest.Mock;
+  maybeSingle: jest.Mock;
+} {
+  const builder = {
+    select: jest.fn(),
+    is: jest.fn(),
+    order: jest.fn(),
+    limit: jest.fn(),
+    maybeSingle: jest.fn().mockResolvedValue(response),
+  };
+  builder.select.mockReturnValue(builder);
+  builder.is.mockReturnValue(builder);
+  builder.order.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+  return builder;
+}
+
 describe("OrdersService", () => {
   let ordersService: OrdersService;
   let supabaseService: { getClient: jest.Mock };
@@ -311,6 +338,10 @@ describe("OrdersService", () => {
         ],
       };
 
+      const cajaBuilder = createCajaLookupBuilder({
+        data: { id: 1 },
+        error: null,
+      });
       const platillosBuilder = createPlatillosBuilder({
         data: platillosRows,
         error: null,
@@ -326,19 +357,34 @@ describe("OrdersService", () => {
       const orderInsertBuilder = createOrderInsertBuilder(99);
       const detailBuilder = createDetailInsertBuilder();
       const inventoryUpsertBuilder = createInventoryUpsertBuilder();
+      const mesaUpdateBuilder = createMesaUpdateBuilder();
       const getOrderBuilder = createGetOrderBuilder({
         data: orderRow,
         error: null,
       });
 
+      // NUEVO: lookup de mesa para .select().eq().maybeSingle()
+      const mesaLookupBuilder = createGetOrderBuilder({
+        data: { id: 3, activa: true },
+        error: null,
+      });
+      const meseroLookupBuilder = createGetOrderBuilder({
+        data: { id: 7, activo: true },
+        error: null,
+      });
+
       fromMock
-        .mockImplementationOnce(() => platillosBuilder)
-        .mockImplementationOnce(() => ingredientesBuilder)
-        .mockImplementationOnce(() => inventarioBuilder)
-        .mockImplementationOnce(() => orderInsertBuilder)
-        .mockImplementationOnce(() => detailBuilder)
-        .mockImplementationOnce(() => inventoryUpsertBuilder)
-        .mockImplementationOnce(() => getOrderBuilder);
+        .mockImplementationOnce(() => cajaBuilder) // from("caja").select().is().maybeSingle()
+        .mockImplementationOnce(() => mesaLookupBuilder) // from("mesas").select().eq().maybeSingle()
+        .mockImplementationOnce(() => meseroLookupBuilder) // from("usuarios").select().eq().maybeSingle()
+        .mockImplementationOnce(() => platillosBuilder) // from("platillos").select().in()
+        .mockImplementationOnce(() => ingredientesBuilder) // from("ingredientes").select().in()
+        .mockImplementationOnce(() => inventarioBuilder) // from("inventario").select().in()
+        .mockImplementationOnce(() => orderInsertBuilder) // from("ordenes").insert().select().single()
+        .mockImplementationOnce(() => detailBuilder) // from("detalle_orden").insert()
+        .mockImplementationOnce(() => inventoryUpsertBuilder) // from("inventario").upsert()
+        .mockImplementationOnce(() => mesaUpdateBuilder) // from("mesas").update().eq()
+        .mockImplementationOnce(() => getOrderBuilder); // from("ordenes").select().eq().maybeSingle()
 
       const dto: CreateOrderDto = {
         mesa_id: 3,
@@ -429,6 +475,18 @@ describe("OrdersService", () => {
     });
 
     it("falla cuando no hay inventario suficiente", async () => {
+      const cajaBuilder = createCajaLookupBuilder({
+        data: { id: 1 },
+        error: null,
+      });
+      const mesaLookupBuilder = createGetOrderBuilder({
+        data: { id: 1, activa: true },
+        error: null,
+      });
+      const meseroLookupBuilder = createGetOrderBuilder({
+        data: { id: 2, activo: true },
+        error: null,
+      });
       const platillosBuilder = createPlatillosBuilder({
         data: [{ id: 10, precio: "12", disponible: true }],
         error: null,
@@ -439,7 +497,7 @@ describe("OrdersService", () => {
             platillo_id: 10,
             producto_id: 100,
             cantidad: "5",
-            producto: [{ id: 100, nombre: "Camarón" }],
+            producto: [{ id: 100, nombre: "Camaron" }],
           },
         ],
         error: null,
@@ -450,20 +508,25 @@ describe("OrdersService", () => {
       });
 
       fromMock
+        .mockImplementationOnce(() => cajaBuilder)
+        .mockImplementationOnce(() => mesaLookupBuilder)
+        .mockImplementationOnce(() => meseroLookupBuilder)
         .mockImplementationOnce(() => platillosBuilder)
         .mockImplementationOnce(() => ingredientesBuilder)
         .mockImplementationOnce(() => inventarioBuilder);
 
       const dto: CreateOrderDto = {
+        mesa_id: 1,
+        mesero_id: 2,
         items: [{ platillo_id: 10, cantidad: 1 }],
       };
 
       const result = await ordersService.createOrder(dto);
       expect(result).toEqual({
         ok: false,
-        message: "No hay suficiente inventario para Camarón",
+        message: "No hay suficiente inventario para Camaron",
       });
-      expect(fromMock).toHaveBeenCalledTimes(3);
+      expect(fromMock).toHaveBeenCalledTimes(6);
     });
   });
 
@@ -656,6 +719,27 @@ describe("OrdersService", () => {
   });
 
   describe("registerPayment", () => {
+    let registerPaymentInCajaSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      registerPaymentInCajaSpy = jest
+        .spyOn(
+          ordersService as unknown as {
+            registerPaymentInCaja: (
+              orderId: number,
+              monto: number,
+              metodo: string,
+              supabase: unknown,
+            ) => Promise<void>;
+          },
+          "registerPaymentInCaja",
+        )
+        .mockResolvedValue();
+    });
+
+    afterEach(() => {
+      registerPaymentInCajaSpy.mockRestore();
+    });
     it("rechaza métodos de pago no soportados", async () => {
       const result = await ordersService.registerPayment(10, {
         metodo_pago: "Cheque",
@@ -663,6 +747,438 @@ describe("OrdersService", () => {
       });
       expect(result).toEqual({ ok: false, message: "Método de pago inválido" });
       expect(fromMock).not.toHaveBeenCalled();
+    });
+
+    it("calcula cambio automáticamente en pago con efectivo que excede el saldo", async () => {
+      const orderRow = {
+        id: 50,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pendiente",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [
+          {
+            id: 100,
+            platillo_id: 5,
+            cantidad: "2",
+            precio_unit: "50",
+            subtotal: "100",
+            platillo: [{ id: 5, nombre: "Paella" }],
+          },
+        ],
+        pagos: [],
+      };
+
+      const firstGetOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      const paymentInsertBuilder = {
+        insert: jest.fn().mockResolvedValue({ error: null }),
+      };
+
+      const orderUpdateBuilder = {
+        eq: jest.fn().mockResolvedValue({ error: null }),
+        update: jest.fn().mockReturnThis(),
+      };
+      orderUpdateBuilder.update.mockReturnValue(orderUpdateBuilder);
+
+      const finalOrderRow = {
+        ...orderRow,
+        estado: "Pagada",
+        pagos: [
+          {
+            id: 1,
+            metodo_pago: "Efectivo",
+            monto: "120",
+            cambio: "20",
+            fecha: "2025-01-10T11:00:00Z",
+          },
+        ],
+      };
+
+      const secondGetOrder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      const mesaUpdateBuilder = createMesaUpdateBuilder();
+
+      fromMock
+        .mockImplementationOnce(() => firstGetOrder)
+        .mockImplementationOnce(() => paymentInsertBuilder)
+        .mockImplementationOnce(() => orderUpdateBuilder)
+        .mockImplementationOnce(() => mesaUpdateBuilder)
+        .mockImplementationOnce(() => secondGetOrder);
+
+      const result = await ordersService.registerPayment(50, {
+        metodo_pago: "Efectivo",
+        monto: 120,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(paymentInsertBuilder.insert).toHaveBeenCalledWith([
+        {
+          orden_id: 50,
+          metodo_pago: "Efectivo",
+          monto: 120,
+          cambio: 20,
+        },
+      ]);
+    });
+
+    it("no calcula cambio cuando el pago es exacto", async () => {
+      const orderRow = {
+        id: 51,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pendiente",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [],
+      };
+
+      const firstGetOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      const paymentInsertBuilder = {
+        insert: jest.fn().mockResolvedValue({ error: null }),
+      };
+
+      const orderUpdateBuilder = {
+        eq: jest.fn().mockResolvedValue({ error: null }),
+        update: jest.fn().mockReturnThis(),
+      };
+      orderUpdateBuilder.update.mockReturnValue(orderUpdateBuilder);
+
+      const finalOrderRow = { ...orderRow, estado: "Pagada" };
+      const secondGetOrder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      const mesaUpdateBuilder = createMesaUpdateBuilder();
+
+      fromMock
+        .mockImplementationOnce(() => firstGetOrder)
+        .mockImplementationOnce(() => paymentInsertBuilder)
+        .mockImplementationOnce(() => orderUpdateBuilder)
+        .mockImplementationOnce(() => mesaUpdateBuilder)
+        .mockImplementationOnce(() => secondGetOrder);
+
+      await ordersService.registerPayment(51, {
+        metodo_pago: "Efectivo",
+        monto: 100,
+      });
+
+      expect(paymentInsertBuilder.insert).toHaveBeenCalledWith([
+        {
+          orden_id: 51,
+          metodo_pago: "Efectivo",
+          monto: 100,
+          cambio: null,
+        },
+      ]);
+    });
+
+    it("no calcula cambio para pagos con tarjeta", async () => {
+      const orderRow = {
+        id: 52,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pendiente",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [],
+      };
+
+      const firstGetOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      const paymentInsertBuilder = {
+        insert: jest.fn().mockResolvedValue({ error: null }),
+      };
+
+      const orderUpdateBuilder = {
+        eq: jest.fn().mockResolvedValue({ error: null }),
+        update: jest.fn().mockReturnThis(),
+      };
+      orderUpdateBuilder.update.mockReturnValue(orderUpdateBuilder);
+
+      const finalOrderRow = { ...orderRow, estado: "Pagada" };
+      const secondGetOrder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      const mesaUpdateBuilder = createMesaUpdateBuilder();
+
+      fromMock
+        .mockImplementationOnce(() => firstGetOrder)
+        .mockImplementationOnce(() => paymentInsertBuilder)
+        .mockImplementationOnce(() => orderUpdateBuilder)
+        .mockImplementationOnce(() => mesaUpdateBuilder)
+        .mockImplementationOnce(() => secondGetOrder);
+
+      await ordersService.registerPayment(52, {
+        metodo_pago: "Tarjeta",
+        monto: 150,
+      });
+
+      expect(paymentInsertBuilder.insert).toHaveBeenCalledWith([
+        {
+          orden_id: 52,
+          metodo_pago: "Tarjeta",
+          monto: 150,
+          cambio: null,
+        },
+      ]);
+    });
+
+    it("actualiza estado a Pagada cuando el pago cubre el total", async () => {
+      const orderRow = {
+        id: 53,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pendiente",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [],
+      };
+
+      const firstGetOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      const paymentInsertBuilder = {
+        insert: jest.fn().mockResolvedValue({ error: null }),
+      };
+
+      const orderUpdateBuilder = {
+        eq: jest.fn().mockResolvedValue({ error: null }),
+        update: jest.fn().mockReturnThis(),
+      };
+      orderUpdateBuilder.update.mockReturnValue(orderUpdateBuilder);
+
+      const finalOrderRow = { ...orderRow, estado: "Pagada" };
+      const secondGetOrder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      const mesaUpdateBuilder = createMesaUpdateBuilder();
+
+      fromMock
+        .mockImplementationOnce(() => firstGetOrder)
+        .mockImplementationOnce(() => paymentInsertBuilder)
+        .mockImplementationOnce(() => orderUpdateBuilder)
+        .mockImplementationOnce(() => mesaUpdateBuilder)
+        .mockImplementationOnce(() => secondGetOrder);
+
+      await ordersService.registerPayment(53, {
+        metodo_pago: "Efectivo",
+        monto: 100,
+      });
+
+      expect(orderUpdateBuilder.update).toHaveBeenCalledWith({
+        estado: "Pagada",
+      });
+      expect(orderUpdateBuilder.eq).toHaveBeenCalledWith("id", 53);
+    });
+
+    it("rechaza pagos en órdenes ya pagadas", async () => {
+      const orderRow = {
+        id: 54,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pagada",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [
+          {
+            id: 1,
+            metodo_pago: "Efectivo",
+            monto: "100",
+            cambio: null,
+            fecha: "2025-01-10T11:00:00Z",
+          },
+        ],
+      };
+
+      const getOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      fromMock.mockImplementationOnce(() => getOrder);
+
+      const result = await ordersService.registerPayment(54, {
+        metodo_pago: "Efectivo",
+        monto: 50,
+      });
+
+      expect(result).toEqual({ ok: false, message: "La orden ya está pagada" });
+      expect(fromMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rechaza pagos en órdenes anuladas", async () => {
+      const orderRow = {
+        id: 55,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Anulada",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [],
+      };
+
+      const getOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      fromMock.mockImplementationOnce(() => getOrder);
+
+      const result = await ordersService.registerPayment(55, {
+        metodo_pago: "Efectivo",
+        monto: 100,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pueden registrar pagos en una orden anulada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("permite pagos parciales sin cambiar estado", async () => {
+      const orderRow = {
+        id: 56,
+        mesa_id: 1,
+        mesero_id: 2,
+        fecha: "2025-01-10T10:00:00Z",
+        estado: "Pendiente",
+        total: "100",
+        mesa: [{ id: 1, numero: "A1" }],
+        mesero: [{ id: 2, nombre: "Juan" }],
+        detalle_orden: [],
+        pagos: [],
+      };
+
+      const firstGetOrder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+
+      const paymentInsertBuilder = {
+        insert: jest.fn().mockResolvedValue({ error: null }),
+      };
+
+      const finalOrderRow = {
+        ...orderRow,
+        pagos: [
+          {
+            id: 1,
+            metodo_pago: "Efectivo",
+            monto: "30",
+            cambio: null,
+            fecha: "2025-01-10T11:00:00Z",
+          },
+        ],
+      };
+
+      const secondGetOrder = createGetOrderBuilder({
+        data: finalOrderRow,
+        error: null,
+      });
+
+      fromMock
+        .mockImplementationOnce(() => firstGetOrder)
+        .mockImplementationOnce(() => paymentInsertBuilder)
+        .mockImplementationOnce(() => secondGetOrder);
+
+      const result = await ordersService.registerPayment(56, {
+        metodo_pago: "Efectivo",
+        monto: 30,
+      });
+
+      expect(result.ok).toBe(true);
+      // No debe haber llamada a update de estado porque aún falta pagar
+      expect(fromMock).toHaveBeenCalledTimes(3); // 2 getOrderById + 1 insert
+    });
+  });
+
+  describe("addItems - validaciones de estado", () => {
+    it("rechaza agregar items a orden pagada", async () => {
+      const orderRow = {
+        id: 70,
+        estado: "Pagada",
+        total: "100",
+      };
+
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+      fromMock.mockImplementationOnce(() => orderLookupBuilder);
+
+      const result = await ordersService.addItems(70, {
+        items: [{ platillo_id: 1, cantidad: 1 }],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pueden agregar items a una orden pagada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rechaza agregar items a orden anulada", async () => {
+      const orderRow = {
+        id: 71,
+        estado: "Anulada",
+        total: "100",
+      };
+
+      const orderLookupBuilder = createGetOrderBuilder({
+        data: orderRow,
+        error: null,
+      });
+      fromMock.mockImplementationOnce(() => orderLookupBuilder);
+
+      const result = await ordersService.addItems(71, {
+        items: [{ platillo_id: 1, cantidad: 1 }],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "No se pueden agregar items a una orden anulada",
+      });
+      expect(fromMock).toHaveBeenCalledTimes(1);
     });
   });
 });

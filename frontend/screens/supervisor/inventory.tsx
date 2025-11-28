@@ -504,7 +504,7 @@ export function Inventory({ user, logout }: InventoryProps) {
 
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
+    <div className="h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
       <div className="m-10">
         <div className="flex items-center gap-4">
           <span className="text-xl manrope-bold">{user.nombre}</span>
@@ -519,8 +519,8 @@ export function Inventory({ user, logout }: InventoryProps) {
         <Separator />
       </div>
 
-      <div className="flex-1 px-6 pb-10">
-        <div className="bg-[var(--secondary)] rounded-2xl shadow-lg pt-6 pb-6 space-y-4">
+      <div className="flex-1 px-6 pb-30 min-h-0">
+        <div className="bg-[var(--secondary)] rounded-2xl shadow-lg pt-6 pb-6 space-y-4 flex flex-col h-full">
           <div className="pl-6 pr-6">
             <SearchBar
               placeholder="Buscar por nombre o categoría"
@@ -529,21 +529,22 @@ export function Inventory({ user, logout }: InventoryProps) {
             />
           </div>
 
-
           {inventoryError && (
             <div className="rounded-md bg-red-100/80 text-red-800 px-4 py-2 text-sm">
               {inventoryError}
             </div>
           )}
 
-          {loadingProducts ? (
-            <p className="text-sm text-[var(--text-secondary)]">Cargando inventario...</p>
-          ) : (
-            <Table<InventoryProduct> columns={columns} data={filteredProducts} />
-
-          )}
-            
+          {/* Área scrollable SOLO para la tabla */}
+          <div className="flex-1 min-h-0 overflow-y-auto table-scroll-area">
+            {loadingProducts ? (
+              <p className="text-sm text-[var(--text-secondary)]">Cargando inventario...</p>
+            ) : (
+              <Table<InventoryProduct> columns={columns} data={filteredProducts} />
+            )}
+          </div>
         </div>
+ 
           <div className="flex flex-wrap gap-3 items-center justify-center m-8">
             <Button
               type="button"
@@ -711,7 +712,7 @@ export function Inventory({ user, logout }: InventoryProps) {
               }
               required
             />
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <div className="flex flex-col sm:flex-row gap-4 w-full items-center pt-2 pb-2">
               <select
                 value={editForm.categoria_id}
                 onChange={(event) =>

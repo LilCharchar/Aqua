@@ -17,7 +17,6 @@ export class UpdateOrderStatusDto {
 export class RegisterPaymentDto {
   metodo_pago!: string;
   monto!: number;
-  cambio?: number | null;
 }
 
 export class AddOrderItemsDto {

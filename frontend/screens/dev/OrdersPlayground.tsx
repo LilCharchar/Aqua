@@ -8,6 +8,12 @@ interface Platillo {
   disponible: boolean;
 }
 
+interface Mesa {
+  id: number;
+  numero: string | null;
+  activa: boolean;
+}
+
 interface ProductOption {
   id: number;
   nombre: string;
@@ -40,9 +46,7 @@ interface OrderDetails {
   items: OrderItem[];
 }
 
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 interface OrderItemInput {
   key: string;
@@ -234,9 +238,12 @@ function OrdersPlayground() {
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [productsError, setProductsError] = useState<string>("");
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [mesasError, setMesasError] = useState<string>("");
+  const [loadingMesas, setLoadingMesas] = useState(false);
 
   const [createForm, setCreateForm] = useState({
-    mesaId: "1",
+    mesaId: "",
     meseroId: "14",
     estado: "Pendiente",
     items: [createItemRow()],
@@ -271,7 +278,6 @@ function OrdersPlayground() {
     orderId: "",
     metodo: "Efectivo",
     monto: "",
-    cambio: "",
   });
   const [paymentResult, setPaymentResult] = useState<string>("");
   const [paymentError, setPaymentError] = useState<string>("");
@@ -294,6 +300,7 @@ function OrdersPlayground() {
   useEffect(() => {
     fetchPlatillos();
     fetchProducts();
+    fetchMesas();
   }, []);
 
   async function fetchPlatillos() {
@@ -334,6 +341,23 @@ function OrdersPlayground() {
       setProductsError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingProducts(false);
+    }
+  }
+
+  async function fetchMesas() {
+    setMesasError("");
+    setLoadingMesas(true);
+    try {
+      const res = await fetch(`${API_URL}/mesas`);
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message ?? "No se pudieron obtener las mesas");
+      }
+      setMesas(data.mesas ?? []);
+    } catch (err) {
+      setMesasError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingMesas(false);
     }
   }
 
@@ -462,26 +486,32 @@ function OrdersPlayground() {
       setPaymentError("Ingresa un ID de orden válido");
       return;
     }
-    const monto = Number(paymentForm.monto);
-    if (!Number.isFinite(monto) || monto <= 0) {
-      setPaymentError("El monto debe ser mayor a 0");
-      return;
+
+    // Si es tarjeta, usar el saldo pendiente de la última orden cargada
+    let monto: number;
+    if (paymentForm.metodo === "Tarjeta") {
+      if (!lastOrder || lastOrder.id !== orderId) {
+        setPaymentError("Primero consulta la orden para pagar con tarjeta");
+        return;
+      }
+      if (lastOrder.saldoPendiente <= 0) {
+        setPaymentError("La orden no tiene saldo pendiente");
+        return;
+      }
+      monto = lastOrder.saldoPendiente;
+    } else {
+      // Para efectivo, usar el monto ingresado
+      monto = Number(paymentForm.monto);
+      if (!Number.isFinite(monto) || monto <= 0) {
+        setPaymentError("El monto debe ser mayor a 0");
+        return;
+      }
     }
-    const cambio = paymentForm.cambio
-      ? Number(paymentForm.cambio)
-      : undefined;
-    if (
-      cambio !== undefined &&
-      (!Number.isFinite(cambio) || Number(cambio) < 0)
-    ) {
-      setPaymentError("El cambio debe ser un número positivo");
-      return;
-    }
+
     try {
       const data = await requestJson(`/orders/${orderId}/payments`, {
         metodo_pago: paymentForm.metodo,
         monto,
-        cambio,
       });
       setPaymentResult(JSON.stringify(data, null, 2));
       if (data?.order) setLastOrder(data.order as OrderDetails);
@@ -622,6 +652,45 @@ function OrdersPlayground() {
         </div>
       </section>
 
+      <section className="bg-slate-800/60 rounded-xl p-4 border border-slate-700">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">Mesas disponibles</h2>
+          <button
+            type="button"
+            onClick={fetchMesas}
+            className="px-3 py-1 rounded border border-slate-500 text-xs hover:bg-slate-700 transition"
+          >
+            Recargar
+          </button>
+        </div>
+        {mesasError && (
+          <p className="text-sm text-red-400 mt-2">{mesasError}</p>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-4">
+          {loadingMesas ? (
+            <p className="col-span-full p-4 text-sm text-slate-400">Cargando...</p>
+          ) : mesas.length === 0 ? (
+            <p className="col-span-full p-4 text-sm text-slate-400">No hay mesas disponibles</p>
+          ) : (
+            mesas.map((mesa) => (
+              <div
+                key={mesa.id}
+                className={`p-3 rounded border ${mesa.activa
+                  ? "border-emerald-500/50 bg-emerald-500/10"
+                  : "border-slate-600 bg-slate-800/40"
+                  }`}
+              >
+                <p className="font-semibold">Mesa {mesa.numero}</p>
+                <p className="text-xs text-slate-400">ID: {mesa.id}</p>
+                <p className={`text-xs mt-1 ${mesa.activa ? "text-emerald-400" : "text-slate-500"}`}>
+                  {mesa.activa ? "Disponible" : "Inactiva"}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       <section className="bg-slate-800/60 rounded-xl p-4 border border-slate-700 space-y-4">
         <h3 className="text-lg font-semibold">Crear nuevo platillo</h3>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -735,13 +804,20 @@ function OrdersPlayground() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Mesa
-              <input
+              <select
                 className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100"
                 value={createForm.mesaId}
                 onChange={(e) =>
                   setCreateForm((prev) => ({ ...prev, mesaId: e.target.value }))
                 }
-              />
+              >
+                <option value="">Seleccionar mesa</option>
+                {mesas.map((mesa) => (
+                  <option key={mesa.id} value={mesa.id}>
+                    Mesa {mesa.numero}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-xs uppercase tracking-wide text-slate-400">
               Mesero
@@ -897,31 +973,29 @@ function OrdersPlayground() {
               </select>
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Monto
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100"
-                value={paymentForm.monto}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, monto: e.target.value }))
-                }
-              />
-            </label>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Cambio (opcional)
-              <input
-                type="number"
-                min="0"
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100"
-                value={paymentForm.cambio}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, cambio: e.target.value }))
-                }
-              />
-            </label>
+          <label className="text-xs uppercase tracking-wide text-slate-400 block">
+            Monto {paymentForm.metodo === "Tarjeta" && "(automático)"}
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              disabled={paymentForm.metodo === "Tarjeta"}
+              className="mt-1 w-full rounded border border-slate-600 bg-slate-900 p-2 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              value={paymentForm.metodo === "Tarjeta" && lastOrder && Number(paymentForm.orderId) === lastOrder.id ? lastOrder.saldoPendiente.toFixed(2) : paymentForm.monto}
+              onChange={(e) =>
+                setPaymentForm((prev) => ({ ...prev, monto: e.target.value }))
+              }
+              placeholder={paymentForm.metodo === "Tarjeta" ? "Se usará el saldo pendiente" : ""}
+            />
+          </label>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+            <p className="text-xs text-blue-200">
+              {paymentForm.metodo === "Efectivo" ? (
+                <>💡 <strong>Cambio automático:</strong> Si pagas con un monto mayor al saldo pendiente, el cambio se calculará automáticamente.</>
+              ) : (
+                <>💳 <strong>Pago con tarjeta:</strong> El monto se toma automáticamente del saldo pendiente de la orden. Asegúrate de consultar la orden primero.</>
+              )}
+            </p>
           </div>
           <button
             type="button"

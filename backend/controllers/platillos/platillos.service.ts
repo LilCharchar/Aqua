@@ -19,6 +19,9 @@ interface PlatilloIngredientRow {
     id: number;
     nombre: string;
     unidad: string | null;
+    inventario?: {
+      cantidad_disponible: number | string;
+    } | null;
   } | null;
 }
 
@@ -28,6 +31,7 @@ interface PlatilloRow {
   descripcion: string | null;
   precio: string | number;
   disponible: boolean;
+  imagen_url: string | null;
   supervisor_id: number | null;
   creado_en: string | null;
   supervisor?: SupervisorRow | null;
@@ -74,10 +78,12 @@ export interface PlatilloResponse {
   descripcion: string | null;
   precio: number;
   disponible: boolean;
+  imagenUrl: string | null;
   supervisorId: number | null;
   supervisorNombre: string | null;
   creadoEn: string | null;
   ingredientes: PlatilloIngredientResponse[];
+  cantidadPreparable: number;
 }
 
 export type PlatillosResponse =
@@ -102,7 +108,7 @@ type SupervisorValidationResult =
 
 @Injectable()
 export class PlatillosService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService) { }
 
   private readonly platilloSelect = `
     id,
@@ -110,6 +116,7 @@ export class PlatillosService {
     descripcion,
     precio,
     disponible,
+    imagen_url,
     supervisor_id,
     creado_en,
     supervisor:usuarios ( id, nombre ),
@@ -120,7 +127,8 @@ export class PlatillosService {
       producto:productos (
         id,
         nombre,
-        unidad
+        unidad,
+        inventario ( cantidad_disponible )
       )
     )
   `;
@@ -139,28 +147,57 @@ export class PlatillosService {
   ): PlatilloIngredientResponse {
     return {
       id: row.id,
-      productoId: row.producto?.id ?? row.producto_id ?? null,
-      productoNombre: row.producto?.nombre ?? null,
-      productoUnidad: row.producto?.unidad ?? null,
+      productoId: row.producto?.id ?? row.producto_id,
+      productoNombre: row.producto?.nombre ?? "Producto no disponible",
+      productoUnidad: row.producto?.unidad ?? "",
       cantidad: this.normalizeDecimal(row.cantidad) ?? 0,
     };
   }
 
   private mapPlatillo(record: PlatilloRow): PlatilloResponse {
     const ingredientes = Array.isArray(record.ingredientes)
-      ? record.ingredientes.map((ing) => this.mapIngredient(ing))
+      ? record.ingredientes
+        .map((ing) => this.mapIngredient(ing))
+        .filter((ing) => ing !== null && ing !== undefined)
       : [];
+
+    let maxPreparable = Infinity;
+    let hasIngredients = false;
+
+for (const ing of record.ingredientes || []) {
+  const required = this.normalizeDecimal(ing.cantidad) ?? 0;
+  const available = this.normalizeDecimal(ing.producto?.inventario?.cantidad_disponible);
+
+  // Si no hay inventario o el producto está null => available = 0
+  if (available == null || isNaN(available)) {
+    maxPreparable = 0;
+    continue;
+  }
+
+  if (required > 0) {
+    const possible = Math.floor(available / required);
+    if (!isNaN(possible) && possible < maxPreparable) {
+      maxPreparable = possible;
+    }
+  }
+}
+
+if (maxPreparable === Infinity) {
+  maxPreparable = 0;
+}
 
     return {
       id: record.id,
       nombre: record.nombre,
       descripcion: record.descripcion ?? null,
       precio: this.normalizeDecimal(record.precio) ?? 0,
-      disponible: Boolean(record.disponible),
+      disponible: maxPreparable > 0,
+      imagenUrl: record.imagen_url ?? null,
       supervisorId: record.supervisor_id ?? null,
       supervisorNombre: record.supervisor?.nombre ?? null,
       creadoEn: record.creado_en ?? null,
       ingredientes,
+      cantidadPreparable: maxPreparable,
     };
   }
 
@@ -290,11 +327,16 @@ export class PlatillosService {
       typeof dto.descripcion === "string" ? dto.descripcion.trim() : "";
     const descripcion = descripcionInput || null;
 
+    const imagenUrlInput =
+      typeof dto.imagen_url === "string" ? dto.imagen_url.trim() : "";
+    const imagen_url = imagenUrlInput || null;
+
     const payload: Record<string, unknown> = {
       nombre,
       descripcion,
       precio,
       disponible,
+      imagen_url,
     };
 
     if (supervisorValidation.value !== undefined) {
@@ -370,6 +412,12 @@ export class PlatillosService {
       const descripcion =
         typeof dto.descripcion === "string" ? dto.descripcion.trim() : "";
       payload.descripcion = descripcion || null;
+    }
+
+    if (dto.imagen_url !== undefined) {
+      const imagenUrl =
+        typeof dto.imagen_url === "string" ? dto.imagen_url.trim() : "";
+      payload.imagen_url = imagenUrl || null;
     }
 
     if (dto.precio !== undefined) {

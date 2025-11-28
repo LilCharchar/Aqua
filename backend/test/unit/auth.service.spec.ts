@@ -1,63 +1,96 @@
 import { AuthService } from "../../controllers/auth/auth.service";
 import { SupabaseService } from "../../src/supabase.service";
 
-type FromBuilder = Record<string, jest.Mock>;
-
-const HASHED_SECRETO =
-  "$2b$10$gA.8HuJBVVlP6IUXulUsQuRSbWcmZ7m7upwi0rBL7hLng.ew663pa";
-const HASHED_OTRO =
-  "$2b$10$Yor8re6gwzNN8slR5pWBWucuZ4.6ABU7qNbjQ.Y/vLH1DNANMK5ya";
+type MaybeSingleResponse = { data: unknown | null; error: Error | null };
+type SingleResponse = { data: unknown | null; error: Error | null };
 
 function createGetUsersBuilder(response: {
   data: unknown[] | null;
   error: Error | null;
-}): FromBuilder {
+}) {
   const order = jest.fn().mockResolvedValue(response);
   const select = jest.fn().mockReturnValue({ order });
-  return { select };
+  return { select, order };
 }
 
-function createLoginBuilder(response: {
-  data: unknown[] | null;
-  error: Error | null;
-}): FromBuilder {
-  const limit = jest.fn().mockResolvedValue(response);
-  const eq = jest.fn().mockReturnValue({ limit });
+function createMaybeSingleBuilder(response: MaybeSingleResponse) {
+  const maybeSingle = jest.fn().mockResolvedValue(response);
+  const eq = jest.fn().mockReturnValue({ maybeSingle });
   const select = jest.fn().mockReturnValue({ eq });
-  return { select };
+  return { select, eq, maybeSingle };
 }
 
-function createUpdateBuilder(response: { data: unknown; error: Error | null }) {
+function createSingleBuilder(response: SingleResponse) {
+  const single = jest.fn().mockResolvedValue(response);
+  const eq = jest.fn().mockReturnValue({ single });
+  const select = jest.fn().mockReturnValue({ eq });
+  return { select, eq, single };
+}
+
+function createInsertBuilder(response: SingleResponse) {
+  const single = jest.fn().mockResolvedValue(response);
+  const select = jest.fn().mockReturnValue({ single });
+  const payloads: Record<string, unknown>[] = [];
+  const insert = jest
+    .fn()
+    .mockImplementation((rows: Record<string, unknown>[]) => {
+      payloads.push(rows[0]);
+      return { select };
+    });
+  return { insert, select, single, payloads };
+}
+
+function createUpdateBuilder(response: SingleResponse) {
   const single = jest.fn().mockResolvedValue(response);
   const select = jest.fn().mockReturnValue({ single });
   const eq = jest.fn().mockReturnValue({ select });
   const payloads: Record<string, unknown>[] = [];
-  const update = jest
-    .fn()
-    .mockImplementation((payload: Record<string, unknown>) => {
-      payloads.push(payload);
-      return { eq };
-    });
-  return { update, payloads };
+  const update = jest.fn().mockImplementation((payload) => {
+    payloads.push(payload);
+    return { eq };
+  });
+  return { update, eq, select, single, payloads };
 }
 
 describe("AuthService", () => {
   let authService: AuthService;
   let supabaseService: { getClient: jest.Mock };
-  let fromMock: jest.Mock;
+  let supabaseClient: {
+    from: jest.Mock;
+    auth: {
+      signInWithPassword: jest.Mock;
+      signUp: jest.Mock;
+      admin: {
+        updateUserById: jest.Mock;
+        deleteUser: jest.Mock;
+      };
+    };
+  };
 
   beforeEach(() => {
-    fromMock = jest.fn();
-    supabaseService = {
-      getClient: jest.fn().mockReturnValue({ from: fromMock }),
+    supabaseClient = {
+      from: jest.fn(),
+      auth: {
+        signInWithPassword: jest.fn(),
+        signUp: jest.fn(),
+        admin: {
+          updateUserById: jest.fn(),
+          deleteUser: jest.fn(),
+        },
+      },
     };
+
+    supabaseService = {
+      getClient: jest.fn().mockReturnValue(supabaseClient),
+    };
+
     authService = new AuthService(
       supabaseService as unknown as SupabaseService,
     );
   });
 
   describe("getUsers", () => {
-    it("regresa la lista de usuarios disponibles", async () => {
+    it("returns the list of users", async () => {
       const users = [
         {
           id: "1",
@@ -68,7 +101,7 @@ describe("AuthService", () => {
         },
       ];
 
-      fromMock.mockReturnValueOnce(
+      supabaseClient.from.mockReturnValueOnce(
         createGetUsersBuilder({ data: users, error: null }),
       );
 
@@ -87,8 +120,8 @@ describe("AuthService", () => {
       });
     });
 
-    it("retorna error cuando Supabase falla", async () => {
-      fromMock.mockReturnValueOnce(
+    it("propagates supabase errors", async () => {
+      supabaseClient.from.mockReturnValueOnce(
         createGetUsersBuilder({ data: null, error: new Error("boom") }),
       );
 
@@ -101,23 +134,28 @@ describe("AuthService", () => {
   });
 
   describe("login", () => {
-    it("valida contraseñas hasheadas", async () => {
-      const user = {
-        id: "1",
-        correo: "user@test.dev",
-        contraseña: HASHED_SECRETO,
-        nombre: "Test",
-        rol_id: 1,
-        activo: true,
-      };
+    it("returns user info when Supabase Auth validates credentials", async () => {
+      supabaseClient.auth.signInWithPassword.mockResolvedValue({
+        data: { user: { id: "1", email: "user@test.dev" } },
+        error: null,
+      });
 
-      fromMock.mockReturnValueOnce(
-        createLoginBuilder({ data: [user], error: null }),
+      supabaseClient.from.mockReturnValueOnce(
+        createMaybeSingleBuilder({
+          data: {
+            id: "1",
+            correo: "user@test.dev",
+            nombre: "Test",
+            rol_id: 2,
+            activo: true,
+          },
+          error: null,
+        }),
       );
 
       const result = await authService.login({
         correo: "user@test.dev",
-        contraseña: "secreto",
+        contraseña: "secret",
       });
 
       expect(result).toEqual({
@@ -125,50 +163,19 @@ describe("AuthService", () => {
         userId: "1",
         correo: "user@test.dev",
         nombre: "Test",
-        rol: 1,
+        rol: 2,
       });
     });
 
-    it("permite contraseñas antiguas sin hash", async () => {
-      const user = {
-        id: "1",
-        correo: "user@test.dev",
-        contraseña: "plain",
-        nombre: "Test",
-        rol_id: 2,
-        activo: true,
-      };
-
-      fromMock.mockReturnValueOnce(
-        createLoginBuilder({ data: [user], error: null }),
-      );
-
-      const result = await authService.login({
-        correo: "user@test.dev",
-        contraseña: "plain",
+    it("rejects invalid credentials", async () => {
+      supabaseClient.auth.signInWithPassword.mockResolvedValue({
+        data: { user: null },
+        error: new Error("invalid"),
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.rol).toBe(2);
-    });
-
-    it("rechaza credenciales inválidas", async () => {
-      const user = {
-        id: "1",
-        correo: "user@test.dev",
-        contraseña: HASHED_OTRO,
-        nombre: "Test",
-        rol_id: 1,
-        activo: true,
-      };
-
-      fromMock.mockReturnValueOnce(
-        createLoginBuilder({ data: [user], error: null }),
-      );
-
       const result = await authService.login({
         correo: "user@test.dev",
-        contraseña: "incorrecto",
+        contraseña: "wrong",
       });
 
       expect(result).toEqual({
@@ -177,23 +184,28 @@ describe("AuthService", () => {
       });
     });
 
-    it("bloquea usuarios inactivos aunque la contraseña sea válida", async () => {
-      const user = {
-        id: "1",
-        correo: "user@test.dev",
-        contraseña: HASHED_SECRETO,
-        nombre: "Test",
-        rol_id: 1,
-        activo: false,
-      };
+    it("blocks inactive users", async () => {
+      supabaseClient.auth.signInWithPassword.mockResolvedValue({
+        data: { user: { id: "1" } },
+        error: null,
+      });
 
-      fromMock.mockReturnValueOnce(
-        createLoginBuilder({ data: [user], error: null }),
+      supabaseClient.from.mockReturnValueOnce(
+        createMaybeSingleBuilder({
+          data: {
+            id: "1",
+            correo: "user@test.dev",
+            nombre: "Test",
+            rol_id: 2,
+            activo: false,
+          },
+          error: null,
+        }),
       );
 
       const result = await authService.login({
         correo: "user@test.dev",
-        contraseña: "secreto",
+        contraseña: "secret",
       });
 
       expect(result).toEqual({
@@ -201,156 +213,159 @@ describe("AuthService", () => {
         message: "Usuario desactivado",
       });
     });
-
-    it("retorna error cuando el usuario no existe", async () => {
-      fromMock.mockReturnValueOnce(
-        createLoginBuilder({ data: [], error: null }),
-      );
-
-      const result = await authService.login({
-        correo: "missing@test.dev",
-        contraseña: "irrelevante",
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        message: "Usuario no encontrado",
-      });
-    });
   });
 
   describe("register", () => {
-    it("guarda contraseñas hasheadas y devuelve el usuario", async () => {
-      const maybeSingle = jest
-        .fn()
-        .mockResolvedValue({ data: null, error: null });
-      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
-      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
-      const existingBuilder = { select: selectExisting };
-
-      const insertedUser = {
-        id: "2",
-        nombre: "Nuevo",
-        correo: "nuevo@test.dev",
-        rol_id: 1,
-        activo: true,
-      };
-      const single = jest
-        .fn()
-        .mockResolvedValue({ data: insertedUser, error: null });
-      const selectAfterInsert = jest.fn().mockReturnValue({ single });
-      type InsertRow = { contraseña: string };
-      const insertPayloads: InsertRow[] = [];
-      const insert = jest.fn().mockImplementation((rows: InsertRow[]) => {
-        insertPayloads.push(rows[0]);
-        return { select: selectAfterInsert };
+    it("registra al usuario con Supabase Auth y guarda metadata local", async () => {
+      const maybeSingle = createMaybeSingleBuilder({
+        data: null,
+        error: null,
       });
-      const insertBuilder = { insert };
+      const insertBuilder = createInsertBuilder({
+        data: {
+          id: "1",
+          nombre: "Nuevo",
+          correo: "nuevo@test.dev",
+          rol_id: 1,
+          activo: true,
+        },
+        error: null,
+      });
 
-      fromMock
-        .mockReturnValueOnce(existingBuilder)
+      supabaseClient.from
+        .mockReturnValueOnce(maybeSingle)
         .mockReturnValueOnce(insertBuilder);
+
+      supabaseClient.auth.signUp.mockResolvedValue({
+        data: { user: { id: "1" } },
+        error: null,
+      });
 
       const result = await authService.register({
         nombre: "Nuevo",
         correo: "nuevo@test.dev",
-        contraseña: "supersecreto",
+        contraseña: "Temporal123",
         rol_id: 1,
-        activo: true,
       });
 
       expect(result).toEqual({
         ok: true,
-        userId: "2",
+        userId: "1",
         nombre: "Nuevo",
         correo: "nuevo@test.dev",
         rol: 1,
         activo: true,
       });
 
-      expect(insert).toHaveBeenCalledTimes(1);
-      const storedPassword = insertPayloads[0].contraseña;
-      expect(storedPassword).not.toBe("supersecreto");
-      expect(storedPassword.startsWith("$2")).toBe(true);
-      expect(storedPassword.length).toBeGreaterThan(20);
+      expect(insertBuilder.payloads[0]).toMatchObject({
+        id: "1",
+        correo: "nuevo@test.dev",
+        nombre: "Nuevo",
+        rol_id: 1,
+      });
+      expect(supabaseClient.auth.signUp).toHaveBeenCalledWith({
+        email: "nuevo@test.dev",
+        password: "Temporal123",
+        options: expect.objectContaining({
+          data: { nombre: "Nuevo" },
+        }),
+      });
     });
 
-    it("evita registros duplicados", async () => {
-      const maybeSingle = jest
-        .fn()
-        .mockResolvedValue({ data: { id: "existing" }, error: null });
-      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
-      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
-
-      fromMock.mockReturnValueOnce({ select: selectExisting });
+    it("stops when correo already exists", async () => {
+      const maybeSingle = createMaybeSingleBuilder({
+        data: { id: "existing" },
+        error: null,
+      });
+      supabaseClient.from.mockReturnValueOnce(maybeSingle);
 
       const result = await authService.register({
         nombre: "Nuevo",
-        correo: "repetido@test.dev",
-        contraseña: "clave",
-        rol_id: 1,
+        correo: "dup@test.dev",
+        contraseña: "Segura123",
       });
 
       expect(result).toEqual({
         ok: false,
         message: "Correo ya registrado",
       });
+      expect(supabaseClient.auth.signUp).not.toHaveBeenCalled();
     });
 
-    it("propaga errores al validar correo existente", async () => {
-      const maybeSingle = jest
-        .fn()
-        .mockResolvedValue({ data: null, error: new Error("db down") });
-      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
-      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
-
-      fromMock.mockReturnValueOnce({ select: selectExisting });
-
-      const result = await authService.register({
-        nombre: "Nuevo",
-        correo: "fallo@test.dev",
-        contraseña: "clave",
+    it("propaga errores de supabase al registrar", async () => {
+      const maybeSingle = createMaybeSingleBuilder({
+        data: null,
+        error: null,
       });
+      supabaseClient.from.mockReturnValueOnce(maybeSingle);
 
-      expect(result).toEqual({
-        ok: false,
-        message: "Error verificando correo",
+      supabaseClient.auth.signUp.mockResolvedValue({
+        data: { user: null },
+        error: new Error("signup-fail"),
       });
-    });
-
-    it("retorna error cuando la inserción falla", async () => {
-      const maybeSingle = jest
-        .fn()
-        .mockResolvedValue({ data: null, error: null });
-      const eqExisting = jest.fn().mockReturnValue({ maybeSingle });
-      const selectExisting = jest.fn().mockReturnValue({ eq: eqExisting });
-
-      const single = jest
-        .fn()
-        .mockResolvedValue({ data: null, error: new Error("insert fail") });
-      const selectAfterInsert = jest.fn().mockReturnValue({ single });
-      const insert = jest.fn().mockReturnValue({ select: selectAfterInsert });
-
-      fromMock
-        .mockReturnValueOnce({ select: selectExisting })
-        .mockReturnValueOnce({ insert });
 
       const result = await authService.register({
         nombre: "Nuevo",
         correo: "nuevo@test.dev",
-        contraseña: "clave",
+        contraseña: "Segura123",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "signup-fail",
+      });
+    });
+
+    it("cleans up auth user if inserting metadata fails", async () => {
+      const maybeSingle = createMaybeSingleBuilder({
+        data: null,
+        error: null,
+      });
+      const insertBuilder = createInsertBuilder({
+        data: null,
+        error: new Error("insert-fail"),
+      });
+
+      supabaseClient.from
+        .mockReturnValueOnce(maybeSingle)
+        .mockReturnValueOnce(insertBuilder);
+
+      supabaseClient.auth.signUp.mockResolvedValue({
+        data: { user: { id: "1" } },
+        error: null,
+      });
+
+      const result = await authService.register({
+        nombre: "Nuevo",
+        correo: "nuevo@test.dev",
+        contraseña: "Segura123",
       });
 
       expect(result).toEqual({
         ok: false,
         message: "No se pudo crear el usuario",
       });
+      expect(supabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith("1");
+    });
+
+    it("valida contraseñas débiles antes de llamar a Supabase", async () => {
+      const result = await authService.register({
+        nombre: "Nuevo",
+        correo: "nuevo@test.dev",
+        contraseña: "123",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "La contraseña debe tener al menos 8 caracteres",
+      });
+      expect(supabaseClient.auth.signUp).not.toHaveBeenCalled();
     });
   });
 
   describe("updateUser", () => {
-    it("actualiza datos y rehashea la contraseña cuando se provee", async () => {
-      const builder = createUpdateBuilder({
+    it("updates metadata and password when both are provided", async () => {
+      const updateBuilder = createUpdateBuilder({
         data: {
           id: "1",
           nombre: "Actualizado",
@@ -361,12 +376,16 @@ describe("AuthService", () => {
         error: null,
       });
 
-      fromMock.mockReturnValueOnce(builder);
+      supabaseClient.from.mockReturnValueOnce(updateBuilder);
+      supabaseClient.auth.admin.updateUserById.mockResolvedValue({
+        data: { user: { id: "1" } },
+        error: null,
+      });
 
       const result = await authService.updateUser("1", {
         nombre: "Actualizado",
-        contraseña: "nueva",
         rol_id: 2,
+        contraseña: "Nueva1234",
       });
 
       expect(result).toEqual({
@@ -377,48 +396,72 @@ describe("AuthService", () => {
         rol: 2,
         activo: true,
       });
-
-      expect(builder.update).toHaveBeenCalledTimes(1);
-      const payload = builder.payloads[0] as {
-        contraseña: string;
-        nombre: string;
-        rol_id: number;
-      };
-      expect(payload.nombre).toBe("Actualizado");
-      expect(payload.rol_id).toBe(2);
-      expect(payload.contraseña).toBeDefined();
-      expect(payload.contraseña).not.toBe("nueva");
-      expect(payload.contraseña.startsWith("$2")).toBe(true);
+      expect(supabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        "1",
+        { password: "Nueva1234" },
+      );
+      expect(updateBuilder.payloads[0]).toMatchObject({
+        nombre: "Actualizado",
+        rol_id: 2,
+      });
     });
 
-    it("devuelve error si no hay campos que actualizar", async () => {
+    it("allows updating only the password", async () => {
+      supabaseClient.auth.admin.updateUserById.mockResolvedValue({
+        data: { user: { id: "1" } },
+        error: null,
+      });
+
+      supabaseClient.from.mockReturnValueOnce(
+        createSingleBuilder({
+          data: {
+            id: "1",
+            nombre: "Test",
+            correo: "user@test.dev",
+            rol_id: 1,
+            activo: true,
+          },
+          error: null,
+        }),
+      );
+
+      const result = await authService.updateUser("1", {
+        contraseña: "SoloPass123",
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        userId: "1",
+        nombre: "Test",
+        correo: "user@test.dev",
+        rol: 1,
+        activo: true,
+      });
+    });
+
+    it("rechaza contraseñas inválidas al actualizar", async () => {
+      const result = await authService.updateUser("1", {
+        contraseña: "abc",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: "La contraseña debe tener al menos 8 caracteres",
+      });
+      expect(supabaseClient.auth.admin.updateUserById).not.toHaveBeenCalled();
+    });
+
+    it("fails if there are no changes", async () => {
       const result = await authService.updateUser("1", {});
       expect(result).toEqual({
         ok: false,
         message: "No hay cambios para aplicar",
       });
     });
-
-    it("retorna error cuando Supabase no actualiza", async () => {
-      const builder = createUpdateBuilder({
-        data: null,
-        error: new Error("update fail"),
-      });
-
-      fromMock.mockReturnValueOnce(builder);
-      const result = await authService.updateUser("1", {
-        nombre: "Sin suerte",
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        message: "No se pudo actualizar el usuario",
-      });
-    });
   });
 
-  describe("cambios de estado", () => {
-    it("desactiva un usuario", async () => {
+  describe("toggle state", () => {
+    it("deactivates a user", async () => {
       const builder = createUpdateBuilder({
         data: {
           id: "1",
@@ -430,9 +473,9 @@ describe("AuthService", () => {
         error: null,
       });
 
-      fromMock.mockReturnValueOnce(builder);
-      const result = await authService.deactivateUser("1");
+      supabaseClient.from.mockReturnValueOnce(builder);
 
+      const result = await authService.deactivateUser("1");
       expect(builder.payloads[0]).toEqual({ activo: false });
       expect(result).toEqual({
         ok: true,
@@ -444,41 +487,14 @@ describe("AuthService", () => {
       });
     });
 
-    it("restaura un usuario desactivado", async () => {
-      const builder = createUpdateBuilder({
-        data: {
-          id: "1",
-          nombre: "Test",
-          correo: "user@test.dev",
-          rol_id: 1,
-          activo: true,
-        },
-        error: null,
-      });
-
-      fromMock.mockReturnValueOnce(builder);
-      const result = await authService.restoreUser("1");
-
-      expect(builder.payloads[0]).toEqual({ activo: true });
-      expect(result).toEqual({
-        ok: true,
-        userId: "1",
-        nombre: "Test",
-        correo: "user@test.dev",
-        rol: 1,
-        activo: true,
-      });
-    });
-
-    it("propaga errores al cambiar estado", async () => {
+    it("propagates errors while updating state", async () => {
       const builder = createUpdateBuilder({
         data: null,
-        error: new Error("state fail"),
+        error: new Error("fail"),
       });
+      supabaseClient.from.mockReturnValueOnce(builder);
 
-      fromMock.mockReturnValueOnce(builder);
       const result = await authService.deactivateUser("1");
-
       expect(result).toEqual({
         ok: false,
         message: "No se pudo actualizar el estado",

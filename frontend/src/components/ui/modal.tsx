@@ -1,12 +1,13 @@
 import React from "react";
 
 type ModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    title?: string;
-    children: React.ReactNode;
-    width?: string;
-    closeOnBackdrop?: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+  width?: string;
+  closeOnBackdrop?: boolean;
+  contentClassName?: string;
 };
 
 const Modal: React.FC<ModalProps> = ({
@@ -16,6 +17,7 @@ const Modal: React.FC<ModalProps> = ({
   children,
   width = "max-w-2xl",
   closeOnBackdrop = true,
+  contentClassName = "",
 }) => {
   if (!isOpen) return null;
   return (
@@ -33,7 +35,7 @@ const Modal: React.FC<ModalProps> = ({
         <div className="flex justify-center items-center mb-6">
           <h2 className="text-2xl manrope-bold">{title}</h2>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="max-h-[70vh] overflow-y-auto table-scroll-area-darker p-2">{children}</div>
       </div>
     </div>
   );
