@@ -5,7 +5,7 @@ export interface OrderItemDto {
 
 export class CreateOrderDto {
   mesa_id?: number | null;
-  mesero_id?: number | null;
+  mesero_id?: number | string | null;
   estado?: string;
   items!: OrderItemDto[];
 }

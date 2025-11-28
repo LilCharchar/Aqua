@@ -5,8 +5,9 @@ import OrderCard from "../../src/components/ui/OrderCard";
 import OrderModal from "../../src/components/ui/OrderModal";
 import Modal from "../../src/components/ui/modal";
 import { RotateCw } from "lucide-react";
+import logo from "../../assets/logo.png";
 
-type SupervisorOrdersProps = {
+type MeseroOrdersProps = {
   user: User;
   logout: () => void;
 };
@@ -22,11 +23,12 @@ type OrderSummary = {
   mesaNumero?: string | null;
   items: OrderItem[];
   total?: number;
+  meseroId?: string | number | null;
 };
 
 const API_URL = "/api";
 
-export function Orders({ user }: SupervisorOrdersProps) {
+export function Orders({ user, logout }: MeseroOrdersProps) {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +44,7 @@ export function Orders({ user }: SupervisorOrdersProps) {
     setLoading(true);
     setError("");
     try {
+      const currentUserId = user?.userId ?? user?.id ?? null;
       const res = await fetch(`${API_URL}/orders`);
       const data = await res.json();
       if (!res.ok || data?.ok === false)
@@ -49,22 +52,46 @@ export function Orders({ user }: SupervisorOrdersProps) {
       // backend might return { orders: [...] } or { data: [...] }
       const list = data.orders ?? data.data ?? [];
       // map to our summary shape conservatively
-      const mapped: OrderSummary[] = (list ?? []).map((o: any) => ({
-        id: o.id,
-        mesaNumero:
-          o.mesa_numero ??
-          o.mesaNumero ??
-          o.mesa?.numero ??
-          String(o.mesa_id ?? ""),
-        items: (o.items ?? o.items_order ?? []).map((it: any) => ({
-          id: it.id,
-          platilloNombre: it.platillo_nombre ?? it.platilloNombre ?? it.nombre,
-          cantidad: it.cantidad,
-          subtotal: it.subtotal ?? it.precio_subtotal,
-        })),
-        total: o.total ?? o.total_amount ?? 0,
-      }));
-      setOrders(mapped);
+      const mapped: OrderSummary[] = (list ?? []).map((o: any) => {
+        const rawMesero =
+          o.mesero ?? o.meseros ?? o.mesero_usuario ?? o.meseroUsuario ?? null;
+        const resolvedMesero =
+          Array.isArray(rawMesero) && rawMesero.length > 0
+            ? rawMesero[0]
+            : rawMesero;
+        return {
+          id: o.id,
+          mesaNumero:
+            o.mesa_numero ??
+            o.mesaNumero ??
+            o.mesa?.numero ??
+            String(o.mesa_id ?? ""),
+          items: (o.items ?? o.items_order ?? []).map((it: any) => ({
+            id: it.id,
+            platilloNombre:
+              it.platillo_nombre ?? it.platilloNombre ?? it.nombre,
+            cantidad: it.cantidad,
+            subtotal: it.subtotal ?? it.precio_subtotal,
+          })),
+          total: o.total ?? o.total_amount ?? 0,
+          meseroId:
+            o.mesero_id ??
+            o.meseroId ??
+            resolvedMesero?.id ??
+            resolvedMesero?.userId ??
+            null,
+        };
+      });
+      const filtered =
+        currentUserId === null
+          ? mapped
+          : mapped.filter(
+              (order) =>
+                order.meseroId !== undefined &&
+                order.meseroId !== null &&
+                String(order.meseroId) === String(currentUserId)
+            );
+      setOrders(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -73,34 +100,28 @@ export function Orders({ user }: SupervisorOrdersProps) {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)] p-8">
-      <div className="m-4">
-        <div className="flex items-center gap-4">
-          <span className="text-xl manrope-bold">{user?.nombre}</span>
-          <div className="ml-auto">
-            <span className="text-s text-[var(--text-primary)]">
-              Supervisor
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
-          <span className="text-3xl manrope-bold">Ordenes</span>
-          <button
-            onClick={fetchOrders}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--text-primary)] text-sm hover:bg-[var(--text-primary)]/10 transition disabled:opacity-60"
-          >
-            <RotateCw
-              size={18}
-              className={loading ? "animate-spin" : ""}
-            />
-            <span className="hidden sm:inline">Actualizar</span>
-          </button>
+    <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
+      <div className="m-14 ml-20">
+        <div className="flex items-center gap-4 mb-2">
+          <img src={logo} alt="Logo" className="h-12 w-auto" />
+          <h1 className="text-2xl manrope-bold">{user?.nombre ?? "—"}</h1>
+          <h2 className="text-sm ml-auto">Mesero</h2>
         </div>
         <Separator />
       </div>
+      <div className="flex items-center justify-between gap-4 flex-wrap px-6 md:px-20">
+        <span className="text-3xl manrope-bold">Órdenes</span>
+        <button
+          onClick={fetchOrders}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--text-primary)] text-sm hover:bg-[var(--text-primary)]/10 transition disabled:opacity-60"
+        >
+          <RotateCw size={18} className={loading ? "animate-spin" : ""} />
+          <span>Actualizar</span>
+        </button>
+      </div>
 
-      <div className="flex-1">
+      <div className="flex-1 px-6 md:px-20 pb-10">
         {loading && (
           <p className="text-sm text-slate-400">Cargando órdenes...</p>
         )}
@@ -133,8 +154,20 @@ export function Orders({ user }: SupervisorOrdersProps) {
         </div>
       </div>
 
+      <div className="mt-auto flex justify-end items-center gap-4 mr-10 mb-6">
+        <button
+          className="hover:scale-105 transition-transform duration-200 text-sm"
+          onClick={logout}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+
       <OrderModal
         isOpen={showCreate}
+        userId={user?.userId ?? user?.id}
+        userName={user?.nombre}
+        lockMesero
         onClose={() => {
           setShowCreate(false);
         }}
@@ -144,6 +177,9 @@ export function Orders({ user }: SupervisorOrdersProps) {
       <OrderModal
         isOpen={!!editOrderId}
         orderId={editOrderId ?? undefined}
+        userId={user?.userId ?? user?.id}
+        userName={user?.nombre}
+        lockMesero
         onClose={() => setEditOrderId(null)}
         onSaved={() => {
           setEditOrderId(null);

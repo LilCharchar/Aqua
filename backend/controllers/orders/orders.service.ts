@@ -26,7 +26,7 @@ interface MesaRow {
 }
 
 interface UsuarioRow {
-  id: number;
+  id: string | number;
   nombre: string | null;
 }
 
@@ -81,7 +81,7 @@ interface InventoryRow {
 interface OrdenRow {
   id: number;
   mesa_id: number | null;
-  mesero_id: number | null;
+  mesero_id: string | number | null;
   fecha: string | null;
   estado: string;
   total: string | number | null;
@@ -160,7 +160,7 @@ export interface OrderResponse {
   id: number;
   mesaId: number | null;
   mesaNumero: string | null;
-  meseroId: number | null;
+  meseroId: string | number | null;
   meseroNombre: string | null;
   estado: string;
   fecha: string | null;
@@ -311,7 +311,7 @@ export class OrdersService {
       return { ok: false, message: "Mesa inválida" };
     }
 
-    const meseroId = this.normalizeNumericId(dto.mesero_id);
+    const meseroId = this.normalizeUserId(dto.mesero_id);
     if (
       dto.mesero_id !== undefined &&
       dto.mesero_id !== null &&
@@ -367,7 +367,7 @@ export class OrdersService {
         return { ok: false, message: "Mesero no encontrado" };
       }
 
-      const mesero = meseroData as { id: number; activo: boolean };
+      const mesero = meseroData as { id: string | number; activo: boolean };
       if (!mesero.activo) {
         return { ok: false, message: "El mesero no está activo" };
       }
@@ -397,7 +397,7 @@ export class OrdersService {
       .insert([
         {
           mesa_id: mesaId,
-          mesero_id: meseroId,
+          mesero_id: meseroId ?? null,
           estado: normalizedStatus,
           total: this.toCurrency(totalIncrement),
         },
@@ -1203,6 +1203,20 @@ export class OrdersService {
       return null;
     }
     return parsed;
+  }
+
+  private normalizeUserId(
+    input?: number | string | null,
+  ): string | null | undefined {
+    if (input === undefined) return undefined;
+    if (input === null) return null;
+    if (typeof input === "number") {
+      if (!Number.isFinite(input) || input <= 0) return null;
+      return String(Math.trunc(input));
+    }
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    return trimmed;
   }
 
   private normalizeDecimal(value: string | number | null | undefined): number {

@@ -244,7 +244,10 @@ export function Usuarios({ onReady }: UsuariosProps = {}) {
       {
         header: "Usuario",
         accessor: "nombre",
-        render: (value) => value ?? "Sin nombre",
+        render: (value) =>
+          typeof value === "string" && value.length > 0
+            ? value
+            : "Sin nombre",
       },
       { header: "Correo", accessor: "correo" },
       {

@@ -11,6 +11,11 @@ export class CajaController {
     return this.cajaService.getCurrentCaja();
   }
 
+  @Get("last/final")
+  async getLastMontoFinal() {
+    return this.cajaService.getLastMontoFinal();
+  }
+
   @Get()
   async listCajas() {
     return this.cajaService.listCajas();

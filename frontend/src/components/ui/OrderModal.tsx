@@ -1,16 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-// Usamos un acceso seguro a import.meta para evitar errores en entornos ES2015
-const getApiUrl = () => {
-  try {
-    // @ts-ignore
-    return (import.meta as any)?.env?.VITE_API_URL ?? "/api";
-  } catch {
-    return "/api";
-  }
-};
-
-const API_URL = getApiUrl();
+const API_URL = "/api";
 
 type OrderModalProps = {
   isOpen: boolean;
@@ -18,12 +8,14 @@ type OrderModalProps = {
   onSaved: () => void;
   orderId?: number | null;
   userId?: string;
+  userName?: string;
+  lockMesero?: boolean;
 };
 
 type Mesa = { id: number; numero: number | null };
 type Platillo = { id: number; nombre: string; precio: number };
 // Agregamos tipo para Usuarios
-type Usuario = { id: string; nombre: string; rol?: string };
+type Usuario = { id: string; nombre: string | null; rol?: string };
 
 type ItemRow = {
   key: string;
@@ -46,6 +38,8 @@ export default function OrderModal({
   onSaved,
   orderId,
   userId,
+  userName,
+  lockMesero = false,
 }: OrderModalProps) {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [platillos, setPlatillos] = useState<Platillo[]>([]);
@@ -76,6 +70,14 @@ export default function OrderModal({
       ? Math.max(0, (Number(paymentAmount) || 0) - total)
       : 0;
 
+  const resolvedMeseroName = useMemo(() => {
+    if (userName && userName.trim()) return userName;
+    const found = usuarios.find((u) => String(u.id) === String(meseroId));
+    if (found?.nombre) return found.nombre;
+    if (meseroId) return `ID: ${meseroId}`;
+    return "Sin asignar";
+  }, [userName, usuarios, meseroId]);
+
   useEffect(() => {
     if (userId) {
       setMeseroId(userId);
@@ -85,7 +87,8 @@ export default function OrderModal({
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
-          if (parsed.id) setMeseroId(parsed.id);
+          const storedId = parsed?.id ?? parsed?.userId;
+          if (storedId) setMeseroId(String(storedId));
         }
       } catch (e) {
         // Ignorar error de parsing
@@ -142,12 +145,21 @@ export default function OrderModal({
   // Nueva función para cargar usuarios
   async function loadUsuarios() {
     try {
-      // Intentamos endpoints comunes, ajusta según tu backend
-      const res = await fetch(`${API_URL}/usuarios`);
+      const res = await fetch(`${API_URL}/auth/users`);
       const data = await res.json();
-      setUsuarios(data.usuarios ?? data.data ?? []);
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message ?? "No se pudo obtener usuarios");
+      }
+      const mapped =
+        (data.users ?? []).map((u: any) => ({
+          id: String(u.userId ?? u.id ?? ""),
+          nombre: u.nombre ?? null,
+          rol: u.rol,
+        })) ?? [];
+      setUsuarios(mapped);
     } catch (e) {
       console.warn("No se pudo cargar la lista de usuarios", e);
+      setUsuarios([]);
     }
   }
 
@@ -171,8 +183,10 @@ export default function OrderModal({
         setMesaNumeroDisplay(String(foundMesaNum));
       }
 
-      if (o.mesero_id || o.meseroId) {
+      if (!lockMesero && (o.mesero_id || o.meseroId)) {
         setMeseroId(String(o.mesero_id || o.meseroId));
+      } else if (lockMesero && userId) {
+        setMeseroId(userId);
       }
 
       const mapped: ItemRow[] =
@@ -292,10 +306,16 @@ export default function OrderModal({
     setLoading(true);
 
     try {
-      const toSend = buildItemsPayload(items);
+      // avoid duplicating platillos already guardados cuando editamos
+      const rowsToSend = orderId ? items.filter((it) => !it.detailId) : items;
+      const toSend = buildItemsPayload(rowsToSend);
 
       if (toSend.length === 0) {
-        setError("Agrega al menos un platillo con cantidad válida");
+        setError(
+          orderId
+            ? "Agrega al menos un platillo nuevo para guardar"
+            : "Agrega al menos un platillo con cantidad válida"
+        );
         setLoading(false);
         return;
       }
@@ -486,7 +506,11 @@ export default function OrderModal({
                 <label className="text-sm text-[var(--text-secondary)]">
                   Encargado
                 </label>
-                {usuarios.length > 0 ? (
+                {lockMesero ? (
+                  <div className="w-full p-3 mt-1 rounded-lg bg-[var(--options)] border border-[rgba(255,255,255,0.1)] text-[var(--text-primary)] manrope-medium">
+                    {resolvedMeseroName}
+                  </div>
+                ) : usuarios.length > 0 ? (
                   <select
                     value={meseroId}
                     onChange={(e) => setMeseroId(e.target.value)}
@@ -622,9 +646,7 @@ export default function OrderModal({
                   <button
                     onClick={deleteOrder}
                     className="px-4 py-2 text-sm text-[var(--warning)] hover:bg-red-900/20 rounded-xl transition"
-                  >
-                    Eliminar Orden
-                  </button>
+                  ></button>
                   <button
                     onClick={() => {
                       setPaymentAmount(String(total));

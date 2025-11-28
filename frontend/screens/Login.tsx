@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { User } from "./types";
 import { AdminHome } from "../screens/admin/adminHome";
 import { MeseroHome } from "../screens/mesero/meseroHome";
-import SupervisorApp from "./supervisor/SupervisorApp";
+import SupervisorApp from "./supervisor/supervisorApp";
 import WaveBackground from "../src/components/wave-background";
 import Input from "../src/components/ui/input";
 import Button from "../src/components/ui/button";
@@ -47,10 +47,22 @@ function Login() {
 
       if (data?.ok) {
         if (typeof data.rol === "number") {
-          setUser({
+          const resolvedId =
+            (typeof data.userId === "string" && data.userId) ||
+            (typeof data.id === "string" && data.id) ||
+            undefined;
+          const nextUser: User = {
+            id: resolvedId,
+            userId: resolvedId,
             nombre: data.nombre,
             rol: data.rol,
-          });
+          };
+          setUser(nextUser);
+          try {
+            localStorage.setItem("user", JSON.stringify(nextUser));
+          } catch {
+            // ignore storage errors
+          }
         } else {
           setResultado("Tu usuario no tiene un rol asignado");
         }
@@ -72,6 +84,11 @@ function Login() {
     setContrasena("");
     setResultado(null);
     setLoading(false);
+    try {
+      localStorage.removeItem("user");
+    } catch {
+      // ignore
+    }
   }
 
   // ✅ Navegación por rol

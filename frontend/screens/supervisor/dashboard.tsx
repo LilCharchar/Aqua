@@ -4,10 +4,9 @@ import MetabaseDashboard from "../../src/components/MetabaseDashboard";
 
 type SupervisorDashboardProps = {
   user: User;
-  logout: () => void;
 };
 
-export function Dashboard({ user, logout }: SupervisorDashboardProps) {
+export function Dashboard({ user }: SupervisorDashboardProps) {
   return (
     <div className="min-h-screen w-full flex flex-col bg-[var(--background)] text-[var(--text-primary)]">
         <div className="m-10">
