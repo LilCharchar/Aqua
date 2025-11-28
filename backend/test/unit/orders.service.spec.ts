@@ -952,6 +952,13 @@ describe("OrdersService", () => {
           cambio: null,
         },
       ]);
+      expect(registerPaymentInCajaSpy).toHaveBeenCalledTimes(1);
+      expect(registerPaymentInCajaSpy).toHaveBeenCalledWith(
+        51,
+        100,
+        "Efectivo",
+        expect.anything(),
+      );
     });
 
     it("no calcula cambio para pagos con tarjeta", async () => {
@@ -1011,6 +1018,7 @@ describe("OrdersService", () => {
           cambio: null,
         },
       ]);
+      expect(registerPaymentInCajaSpy).not.toHaveBeenCalled();
     });
 
     it("actualiza estado a Pagada cuando el pago cubre el total", async () => {

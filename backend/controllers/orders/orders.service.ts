@@ -649,8 +649,10 @@ export class OrdersService {
       return { ok: false, message: "No se pudo registrar el pago" };
     }
 
-    // Registrar ingreso en caja (si hay caja abierta)
-    await this.registerPaymentInCaja(orderId, monto, metodoPago, supabase);
+    // Registrar ingreso en caja solo para pagos en efectivo
+    if (metodoPago === "Efectivo") {
+      await this.registerPaymentInCaja(orderId, monto, metodoPago, supabase);
+    }
 
     // Verificar si la orden debe marcarse como pagada
     const nuevoTotalPagado = this.toCurrency(order.totalPagado + monto);

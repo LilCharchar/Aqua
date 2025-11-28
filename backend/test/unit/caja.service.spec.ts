@@ -67,7 +67,7 @@ describe("CajaService", () => {
   });
 
   describe("openCaja", () => {
-    it("debería abrir una nueva caja exitosamente", async () => {
+    it("debería abrir una nueva caja usando el monto final anterior", async () => {
       const dto = {
         supervisor_id: "uuid-supervisor-123",
         monto_inicial: 500,
@@ -79,13 +79,19 @@ describe("CajaService", () => {
         error: null,
       });
 
+      const lastCajaBuilder =
+        createMaybeSingleBuilder<{ monto_final: number | null } | null>({
+          data: { monto_final: 750 },
+          error: null,
+        });
+
       // Mock para insertar nueva caja
       const insertBuilder = {
         single: jest.fn().mockResolvedValue({
           data: {
             id: 1,
             supervisor_id: dto.supervisor_id,
-            monto_inicial: dto.monto_inicial,
+            monto_inicial: 750,
             monto_final: null,
             diferencia: null,
             abierto_en: "2025-01-01T10:00:00Z",
@@ -102,6 +108,7 @@ describe("CajaService", () => {
 
       fromMock
         .mockImplementationOnce(() => checkOpenBuilder)
+        .mockImplementationOnce(() => lastCajaBuilder)
         .mockImplementationOnce(() => insertBuilder);
 
       const result = await cajaService.openCaja(dto);
@@ -109,8 +116,8 @@ describe("CajaService", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.caja.id).toBe(1);
-        expect(result.caja.montoInicial).toBe(500);
-        expect(result.caja.saldoActual).toBe(500);
+        expect(result.caja.montoInicial).toBe(750);
+        expect(result.caja.saldoActual).toBe(750);
         expect(result.caja.cerradoEn).toBeNull();
       }
     });
@@ -136,7 +143,7 @@ describe("CajaService", () => {
       }
     });
 
-    it("debería rechazar monto inicial negativo", async () => {
+    it("usa 0 como monto inicial si no hay historial previo", async () => {
       const dto = {
         supervisor_id: "uuid-supervisor-123",
         monto_inicial: -100,
@@ -147,13 +154,43 @@ describe("CajaService", () => {
         error: null,
       });
 
-      fromMock.mockImplementationOnce(() => checkOpenBuilder);
+      const lastCajaBuilder =
+        createMaybeSingleBuilder<{ monto_final: number | null } | null>({
+          data: null,
+          error: null,
+        });
+
+      const insertBuilder = {
+        single: jest.fn().mockResolvedValue({
+          data: {
+            id: 2,
+            supervisor_id: dto.supervisor_id,
+            monto_inicial: 0,
+            monto_final: null,
+            diferencia: null,
+            abierto_en: "2025-01-02T10:00:00Z",
+            cerrado_en: null,
+            usuario: { id: dto.supervisor_id, nombre: "Test Supervisor" },
+          },
+          error: null,
+        }),
+        select: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+      };
+      insertBuilder.insert.mockReturnValue(insertBuilder);
+      insertBuilder.select.mockReturnValue(insertBuilder);
+
+      fromMock
+        .mockImplementationOnce(() => checkOpenBuilder)
+        .mockImplementationOnce(() => lastCajaBuilder)
+        .mockImplementationOnce(() => insertBuilder);
 
       const result = await cajaService.openCaja(dto);
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.message).toContain("Monto inicial inválido");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.caja.montoInicial).toBe(0);
+        expect(result.caja.saldoActual).toBe(0);
       }
     });
   });
