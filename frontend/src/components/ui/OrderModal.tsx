@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  generateInvoicePdf,
+  type InvoiceOrderDetail,
+  type InvoicePayment,
+} from "../../utils/invoice";
 
 const API_URL = "/api";
 
@@ -32,6 +37,48 @@ function newItemRow(): ItemRow {
   return { key: makeKey(), platilloId: "", cantidad: 1 };
 }
 
+function mapOrderToInvoice(order: any): InvoiceOrderDetail | null {
+  if (!order) return null;
+  const items =
+    Array.isArray(order.items) && order.items.length > 0
+      ? order.items.map((item: any) => ({
+          id: Number(item.id ?? 0),
+          platilloNombre:
+            item.platilloNombre ??
+            item.platillo_nombre ??
+            item.platillo?.nombre ??
+            null,
+          cantidad: Number(item.cantidad ?? 0),
+          precioUnit: Number(item.precioUnit ?? item.precio_unit ?? 0),
+          subtotal: Number(item.subtotal ?? 0),
+        }))
+      : [];
+
+  const mesaNumeroValue =
+    order.mesaNumero ??
+    order.mesa_numero ??
+    (order.mesa && order.mesa.numero !== undefined && order.mesa.numero !== null
+      ? String(order.mesa.numero)
+      : order.mesaId
+      ? String(order.mesaId)
+      : null);
+
+  return {
+    id: Number(order.id ?? 0),
+    mesaNumero: mesaNumeroValue,
+    meseroNombre:
+      order.meseroNombre ??
+      order.mesero_nombre ??
+      order.mesero?.nombre ??
+      null,
+    estado: order.estado ?? null,
+    total: Number(order.total ?? 0),
+    totalPagado: Number(order.totalPagado ?? order.total_pagado ?? 0),
+    saldoPendiente: Number(order.saldoPendiente ?? order.saldo_pendiente ?? 0),
+    items,
+  };
+}
+
 export default function OrderModal({
   isOpen,
   onClose,
@@ -59,6 +106,12 @@ export default function OrderModal({
   const [isPaymentView, setIsPaymentView] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<{
+    payment: InvoicePayment;
+    order: InvoiceOrderDetail | null;
+  } | null>(null);
+  const [invoiceMessage, setInvoiceMessage] = useState<string | null>(null);
 
   const total = items.reduce((acc, it) => {
     const p = platillos.find((x) => x.id === Number(it.platilloId));
@@ -101,6 +154,9 @@ export default function OrderModal({
     setError(null);
     setIsPaymentView(false);
     setPaymentAmount("");
+    setPaymentSuccess(false);
+    setInvoiceData(null);
+    setInvoiceMessage(null);
 
     loadMesas();
     loadPlatillos();
@@ -275,7 +331,13 @@ export default function OrderModal({
 
   async function processPayment() {
     if (!orderId) return;
+    setError(null);
+    setInvoiceMessage(null);
     const monto = Number(paymentAmount);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      setError("Ingresa un monto válido mayor a cero.");
+      return;
+    }
     if (monto < total) {
       setError("El monto recibido no puede ser menor al total.");
       return;
@@ -288,10 +350,59 @@ export default function OrderModal({
         body: JSON.stringify({ metodo_pago: paymentMethod, monto: monto }),
       });
       const data = await res.json();
-      if (!res.ok || data?.ok === false)
+      if (!res.ok || data?.ok === false) {
         throw new Error(data?.message ?? "Error procesando el pago");
-      onSaved();
-      onClose();
+      }
+
+      const orderPayload = data.order ?? data.data ?? null;
+      const invoiceOrder = mapOrderToInvoice(orderPayload);
+      const paymentList = Array.isArray(orderPayload?.pagos)
+        ? [...orderPayload.pagos]
+        : [];
+      paymentList.sort(
+        (a: any, b: any) => Number(a.id ?? 0) - Number(b.id ?? 0)
+      );
+      const lastPayment = paymentList.length
+        ? paymentList[paymentList.length - 1]
+        : null;
+
+      if (!invoiceOrder) {
+        setInvoiceMessage(
+          "Pago registrado. No se pudo reconstruir el detalle de la orden para la factura."
+        );
+      } else {
+        setInvoiceMessage(
+          "Pago registrado correctamente. Puedes generar la factura."
+        );
+      }
+
+      const inferredCambio =
+        lastPayment?.cambio !== undefined && lastPayment?.cambio !== null
+          ? Number(lastPayment.cambio)
+          : paymentMethod === "Efectivo"
+          ? Math.max(0, monto - (invoiceOrder?.total ?? total))
+          : 0;
+
+      const invoicePayment: InvoicePayment = {
+        id: Number(lastPayment?.id ?? Date.now()),
+        orderId: orderPayload?.id ?? orderId,
+        metodoPago:
+          lastPayment?.metodo_pago ?? lastPayment?.metodoPago ?? paymentMethod,
+        monto: Number(lastPayment?.monto ?? monto),
+        cambio: inferredCambio,
+        fecha: lastPayment?.fecha ?? new Date().toISOString(),
+        orderEstado: invoiceOrder?.estado ?? orderPayload?.estado ?? null,
+        orderTotal: invoiceOrder?.total ?? Number(orderPayload?.total ?? total),
+        mesaNumero: invoiceOrder?.mesaNumero ?? null,
+        meseroNombre:
+          invoiceOrder?.meseroNombre ?? resolvedMeseroName ?? null,
+      };
+
+      setInvoiceData({
+        payment: invoicePayment,
+        order: invoiceOrder,
+      });
+      setPaymentSuccess(true);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al procesar el pago"
@@ -372,6 +483,23 @@ export default function OrderModal({
     setLoading(false);
   }
 
+  function handleInvoiceDownload() {
+    if (!invoiceData) {
+      window.alert("No hay información suficiente para generar la factura.");
+      return;
+    }
+    generateInvoicePdf(invoiceData.payment, invoiceData.order);
+  }
+
+  function handleCloseAfterPayment() {
+    setPaymentSuccess(false);
+    setInvoiceData(null);
+    setInvoiceMessage(null);
+    setIsPaymentView(false);
+    onSaved();
+    onClose();
+  }
+
   if (!isOpen) return null;
 
   return (
@@ -413,11 +541,12 @@ export default function OrderModal({
                     <button
                       key={m}
                       onClick={() => setPaymentMethod(m)}
+                      disabled={paymentSuccess}
                       className={`p-3 rounded-lg border text-center transition ${
                         paymentMethod === m
                           ? "bg-[var(--secondary-accent)] border-[var(--secondary-accent)] text-white"
                           : "bg-[var(--options)] border-transparent text-[var(--text-secondary)]"
-                      }`}
+                      } ${paymentSuccess ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                       {m}
                     </button>
@@ -433,7 +562,8 @@ export default function OrderModal({
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder={`Mínimo ${total}`}
-                  className="w-full p-3 rounded-lg bg-[var(--options)] border border-[rgba(255,255,255,0.1)] focus:border-[var(--secondary-accent)] outline-none text-lg"
+                  disabled={paymentSuccess}
+                  className={`w-full p-3 rounded-lg bg-[var(--options)] border border-[rgba(255,255,255,0.1)] focus:border-[var(--secondary-accent)] outline-none text-lg ${paymentSuccess ? "opacity-60 cursor-not-allowed" : ""}`}
                 />
               </div>
               {paymentMethod === "Efectivo" && (
@@ -452,21 +582,50 @@ export default function OrderModal({
                 {error}
               </div>
             )}
-            <div className="flex justify-between gap-3 pt-2">
-              <button
-                onClick={() => setIsPaymentView(false)}
-                className="flex-1 px-4 py-3 rounded-xl bg-[var(--options)] text-[var(--text-primary)] hover:brightness-110 transition"
+            {invoiceMessage && (
+              <div
+                className={`p-3 rounded text-sm text-center ${
+                  invoiceData
+                    ? "bg-emerald-900/30 border border-emerald-500/40 text-emerald-100"
+                    : "bg-amber-900/30 border border-amber-500/40 text-amber-100"
+                }`}
               >
-                Atrás
-              </button>
-              <button
-                onClick={processPayment}
-                disabled={loading}
-                className="flex-[2] px-4 py-3 rounded-xl bg-[var(--confirmation)] text-white hover:brightness-110 transition disabled:opacity-50 font-semibold"
-              >
-                {loading ? "Procesando..." : "Confirmar Pago"}
-              </button>
-            </div>
+                {invoiceMessage}
+              </div>
+            )}
+            {paymentSuccess ? (
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={handleInvoiceDownload}
+                  disabled={!invoiceData}
+                  className="px-4 py-3 rounded-xl bg-[var(--secondary-accent)] text-white font-semibold hover:brightness-110 transition disabled:opacity-50"
+                >
+                  Generar factura
+                </button>
+                <button
+                  onClick={handleCloseAfterPayment}
+                  className="px-4 py-3 rounded-xl bg-[var(--options)] text-[var(--text-primary)] hover:brightness-110 transition"
+                >
+                  Cerrar
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between gap-3 pt-2">
+                <button
+                  onClick={() => setIsPaymentView(false)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--options)] text-[var(--text-primary)] hover:brightness-110 transition"
+                >
+                  Atrás
+                </button>
+                <button
+                  onClick={processPayment}
+                  disabled={loading}
+                  className="flex-[2] px-4 py-3 rounded-xl bg-[var(--confirmation)] text-white hover:brightness-110 transition disabled:opacity-50 font-semibold"
+                >
+                  {loading ? "Procesando..." : "Confirmar Pago"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>
