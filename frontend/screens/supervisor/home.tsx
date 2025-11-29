@@ -27,6 +27,7 @@ type CajaResponse = {
   cerradoEn: string | null;
   totalIngresos: number;
   totalEgresos: number;
+  totalTarjeta: number;
   saldoActual: number;
   diferencia: number | null;
   transacciones: CajaTransaccion[];
@@ -188,6 +189,19 @@ if(window.confirm(`¿Confirmar cierre con ${formatCurrency(montoFinal)} en EFECT
             </div>
             <span className="text-lg manrope-bold text-green-600">
               +{formatCurrency(caja.totalIngresos)}
+            </span>
+          </div>
+
+          <div className="h-0.5 w-full bg-[var(--text-secondary)]/20"></div>
+
+          {/* Tarjeta de Pagos con Tarjeta */}
+          <div className="p-4 rounded-lg flex justify-between items-center">
+            <div>
+              <span className="block text-[var(--text-primary)] manrope-medium">Pagos con tarjeta</span>
+              <span className="text-xs manrope-light text-[var(--text-secondary)]">Total consignado fuera de caja</span>
+            </div>
+            <span className="text-lg manrope-bold text-blue-600">
+              {formatCurrency(caja.totalTarjeta)}
             </span>
           </div>
 

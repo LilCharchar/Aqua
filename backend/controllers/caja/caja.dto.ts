@@ -31,6 +31,7 @@ export interface CajaResponse {
   cerradoEn: string | null;
   totalIngresos: number;
   totalEgresos: number;
+  totalTarjeta: number;
   saldoActual: number;
   diferencia: number | null; // monto_final - saldo_actual (positivo = sobrante, negativo = faltante)
   transacciones: CajaTransaccionResponse[];
