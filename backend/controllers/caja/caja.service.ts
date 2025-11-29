@@ -131,6 +131,7 @@ export class CajaService {
   private mapCaja(
     record: CajaRow,
     transactions: TransaccionRow[],
+    totalTarjeta: number,
   ): CajaResponse {
     const usuario = this.extractSingle(record.usuario);
     const montoInicial = this.toDecimal(record.monto_inicial);
@@ -180,10 +181,46 @@ export class CajaService {
       cerradoEn: record.cerrado_en,
       totalIngresos,
       totalEgresos,
+      totalTarjeta,
       saldoActual,
       diferencia,
       transacciones: mappedTransactions,
     };
+  }
+
+  private async calculateTarjetaTotal(
+    record: CajaRow,
+    supabase: SupabaseClient,
+  ): Promise<number> {
+    if (!record.abierto_en) {
+      return 0;
+    }
+
+    try {
+      const endDate = record.cerrado_en ?? new Date().toISOString();
+      const response = (await supabase
+        .from("pagos")
+        .select("monto, fecha")
+        .eq("metodo_pago", "Tarjeta")
+        .gte("fecha", record.abierto_en)
+        .lte("fecha", endDate)) as PostgrestSingleResponse<
+        { monto: string | number | null }[]
+      >;
+
+      if (response.error) {
+        console.error("Error fetching tarjeta payments:", response.error);
+        return 0;
+      }
+
+      const rows = response.data ?? [];
+      return rows.reduce(
+        (acc, pago) => acc + this.toDecimal(pago.monto ?? 0),
+        0,
+      );
+    } catch (error) {
+      console.error("Unexpected error calculating tarjeta total:", error);
+      return 0;
+    }
   }
 
   async getCurrentCaja(): Promise<CajaSingleResponse> {
@@ -210,7 +247,11 @@ export class CajaService {
       }
 
       const transactions = await this.fetchTransactions(record.id, supabase);
-      const caja = this.mapCaja(record, transactions);
+      const totalTarjeta = await this.calculateTarjetaTotal(
+        record,
+        supabase,
+      );
+      const caja = this.mapCaja(record, transactions, totalTarjeta);
 
       return { ok: true, caja };
     } catch (error: unknown) {
@@ -256,7 +297,11 @@ export class CajaService {
       const cajas: CajaResponse[] = [];
       for (const record of data) {
         const transactions = await this.fetchTransactions(record.id, supabase);
-        cajas.push(this.mapCaja(record, transactions));
+        const totalTarjeta = await this.calculateTarjetaTotal(
+          record,
+          supabase,
+        );
+        cajas.push(this.mapCaja(record, transactions, totalTarjeta));
       }
 
       return { ok: true, cajas };
@@ -288,7 +333,11 @@ export class CajaService {
       }
 
       const transactions = await this.fetchTransactions(record.id, supabase);
-      const caja = this.mapCaja(record, transactions);
+      const totalTarjeta = await this.calculateTarjetaTotal(
+        record,
+        supabase,
+      );
+      const caja = this.mapCaja(record, transactions, totalTarjeta);
 
       return { ok: true, caja };
     } catch (error: unknown) {
@@ -344,7 +393,7 @@ export class CajaService {
         };
       }
 
-      const caja = this.mapCaja(insertResponse.data, []);
+      const caja = this.mapCaja(insertResponse.data, [], 0);
 
       return { ok: true, caja };
     } catch (error: unknown) {
@@ -416,7 +465,15 @@ export class CajaService {
       }
 
       const updatedTransactions = await this.fetchTransactions(id, supabase);
-      const caja = this.mapCaja(updateResponse.data, updatedTransactions);
+      const totalTarjeta = await this.calculateTarjetaTotal(
+        updateResponse.data,
+        supabase,
+      );
+      const caja = this.mapCaja(
+        updateResponse.data,
+        updatedTransactions,
+        totalTarjeta,
+      );
 
       return { ok: true, caja };
     } catch (error: unknown) {

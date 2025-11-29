@@ -1,83 +1,47 @@
-import type { User } from "../types"
+import type { User } from "../types";
 import Separator from "../../src/components/separator";
-import {useState, useEffect, useCallback} from 'react';
-import {Table, type Column} from "../../src/components/ui/table";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Table, type Column } from "../../src/components/ui/table";
+import type { PaymentHistoryRow, PaymentsHistoryResponse } from "../../src/types/payments";
+import { generateInvoicePdf, type InvoiceOrderDetail } from "../../src/utils/invoice";
 
 type VentasHomeProps = {
   user: User;
 };
 
-type PaymentOrder = {
-    id: number,
-    estado: string;
-    total: number;
-    mesaNumero: number | null;
-    meseroNombre: string | null;
-};
-
-type PaymentHistoryRow = {
-    id: number,
-    orden_id: number,
-    metodoPago: string;
-    monto: number;
-    cambio: number;
-    fecha: string;
-    orden: PaymentOrder;
-}
-
-type PaymentsHistoryResponse = {
-    ok: true;
-    pagos: PaymentHistoryRow[];
-}| {
-  ok: false;
-  message: string;
-};
+type OrderSingleResponse =
+  | {
+      ok: true;
+      order: {
+        id: number;
+        mesaNumero: string | null;
+        meseroNombre: string | null;
+        estado: string;
+        total: number;
+        totalPagado: number;
+        saldoPendiente: number;
+        items: InvoiceOrderDetail["items"];
+      };
+    }
+  | { ok: false; message: string };
 
 const API_PAYMENTS_URL = "/api/orders/payments";
 
-function formatCurrency(amount: number){
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP'
-    }).format(amount);
+function formatCurrency(amount?: number | null) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 2,
+  }).format(amount ?? 0);
 }
 
-const PAYMENT_COLUMNS: Column<PaymentHistoryRow>[] = [
-
-    {
-        header: "ID_PAGO",
-        accessor: "id",
-        width: "10%"
-    },
-    {
-        header: "Metodo",
-        accessor: "metodoPago",
-        render: (value) =>(
-            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${value === 'Efectivo' ? 'bg-indigo-100 text-indigo-800' : 'bg-pink-100 text-pink-800'}`}>
-                {value as string}
-            </span>
-        ),
-        width: "10%"
-    },
-    {
-        header: "Monto Recibido",
-        accessor: "monto",
-        render: (value) =>  formatCurrency(value as number),
-        width: "10%"
-    },
-    {
-        header: "Cambio",
-        accessor: "cambio",
-        render: (value) => formatCurrency(value as number),
-        width: "10%"
-    },
-    {
-        header: "Fecha",
-        accessor: "fecha",
-        render: (value) => new Date(value as string).toLocaleString(),
-        width: "25%",
-    },
-];
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "Sin registro";
+  return new Date(value).toLocaleString("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+};
 
 const PaymentHistory: React.FC = () => {
     const [allPayments, setAllPayments] = useState<PaymentHistoryRow[]>([]);
@@ -87,6 +51,7 @@ const PaymentHistory: React.FC = () => {
 
     const [filterDate, setFilterDate] = useState<string>(''); // YYYY-MM-DD
     const [filterMethod, setFilterMethod] = useState<string>('all');
+    const orderCache = useRef<Map<number, InvoiceOrderDetail | null>>(new Map());
 
     const METHOD_OPTIONS = ['Efectivo', 'Tarjeta', 'Otro'];
 
@@ -123,9 +88,10 @@ const PaymentHistory: React.FC = () => {
 
     // 🔵 FILTRO POR FECHA
     if (filterDate) {
-        filtered = filtered.filter(p =>
-            p.fecha.startsWith(filterDate)
-        );
+        filtered = filtered.filter(p => {
+            if (!p.fecha) return false;
+            return p.fecha.startsWith(filterDate);
+        });
     }
 
     // 🔵 FILTRO POR MÉTODO
@@ -137,6 +103,105 @@ const PaymentHistory: React.FC = () => {
     setPayments(filtered);
     }, [filterDate, filterMethod, allPayments]);
 
+    const fetchOrderDetail = useCallback(
+      async (orderId: number): Promise<InvoiceOrderDetail | null> => {
+        if (orderCache.current.has(orderId)) {
+          return orderCache.current.get(orderId) ?? null;
+        }
+        try {
+          const res = await fetch(`/api/orders/${orderId}`);
+          if (!res.ok) {
+            throw new Error("Respuesta inválida del servidor");
+          }
+          const data: OrderSingleResponse = await res.json();
+          if (data.ok && data.order) {
+            const detail: InvoiceOrderDetail = {
+              id: data.order.id,
+              mesaNumero: data.order.mesaNumero,
+              meseroNombre: data.order.meseroNombre,
+              estado: data.order.estado,
+              total: data.order.total,
+              totalPagado: data.order.totalPagado,
+              saldoPendiente: data.order.saldoPendiente,
+              items: data.order.items,
+            };
+            orderCache.current.set(orderId, detail);
+            return detail;
+          }
+          orderCache.current.set(orderId, null);
+          return null;
+        } catch (error) {
+          console.error("No se pudo obtener la orden para la factura:", error);
+          orderCache.current.set(orderId, null);
+          return null;
+        }
+      },
+      [],
+    );
+
+    const handleInvoice = useCallback(
+      async (payment: PaymentHistoryRow) => {
+        let orderDetail: InvoiceOrderDetail | null = null;
+        if (payment.orderId) {
+          orderDetail = await fetchOrderDetail(payment.orderId);
+          if (!orderDetail) {
+            window.alert(
+              "No se pudo cargar el detalle de la orden. La factura mostrará solo los totales.",
+            );
+          }
+        }
+        generateInvoicePdf(payment, orderDetail);
+      },
+      [fetchOrderDetail],
+    );
+
+    const columns = useMemo<Column<PaymentHistoryRow>[]>(() => [
+      { header: "ID_PAGO", accessor: "id", width: "10%" },
+      {
+        header: "Metodo",
+        accessor: "metodoPago",
+        render: (value) => (
+          <span
+            className={`px-2 py-1 text-xs font-semibold rounded-full ${value === "Efectivo" ? "bg-indigo-100 text-indigo-800" : "bg-pink-100 text-pink-800"}`}
+          >
+            {value as string}
+          </span>
+        ),
+        width: "10%",
+      },
+      {
+        header: "Monto Recibido",
+        accessor: "monto",
+        render: (value) => formatCurrency(value as number),
+        width: "10%",
+      },
+      {
+        header: "Cambio",
+        accessor: "cambio",
+        render: (value) => formatCurrency(value as number | null),
+        width: "10%",
+      },
+      {
+        header: "Fecha",
+        accessor: "fecha",
+        render: (value) => formatDateTime(value as string | null),
+        width: "20%",
+      },
+      {
+        header: "Factura",
+        accessor: "id",
+        render: (_, row) => (
+          <button
+            type="button"
+            onClick={() => handleInvoice(row)}
+            className="px-3 py-1 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition"
+          >
+            Generar
+          </button>
+        ),
+        width: "15%",
+      },
+    ], [handleInvoice]);
 
     return(
         <div className="mt-5">
@@ -170,7 +235,7 @@ const PaymentHistory: React.FC = () => {
                 <div className="rounded-xl overflow-hidden border">
                     <Table<PaymentHistoryRow> 
                         data={payments} 
-                        columns={PAYMENT_COLUMNS} 
+                        columns={columns} 
                     />
                 </div>
 
