@@ -14,7 +14,10 @@ function Login() {
   const [contraseña, setContrasena] = useState("");
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
+  const [showVideo, setShowVideo] = useState(false);
 
+  const videoUrl =
+    import.meta.env.VITE_YOUTUBE_URL || null;
   // ✅ Usuario completo tipado
   const [user, setUser] = useState<User | null>(null);
 
@@ -139,6 +142,49 @@ function Login() {
         </div>
       </div>
       <WaveBackground />
+      {videoUrl && (
+        <button
+          type="button"
+          onClick={() => setShowVideo(true)}
+          className="fixed bottom-6 left-6 z-40 flex items-center gap-3 rounded-full bg-white/90 text-[#FF0000] px-5 py-3 shadow-2xl hover:bg-white hover:scale-105 transition"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            className="w-6 h-6"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M21.8 8s-.2-1.5-.8-2.1c-.8-.8-1.7-.8-2.1-.8C15.7 5 12 5 12 5h-.1s-3.7 0-6.9.1c-.4 0-1.3 0-2.1.8C2.3 6.5 2.2 8 2.2 8S2 9.6 2 11.3v1.4c0 1.7.2 3.3.2 3.3s.2 1.5.8 2.1c.8.8 1.8.8 2.3.9 1.7.1 7 .1 7 .1s3.7 0 6.9-.1c.4 0 1.3 0 2.1-.8.6-.6.8-2.1.8-2.1s.2-1.7.2-3.3v-1.4C22 9.6 21.8 8 21.8 8zm-12.8 6V8l5.7 3-5.7 3z" />
+          </svg>
+          <span className="text-sm font-semibold text-[var(--primary)]">
+            Video Aqua Storytelling
+          </span>
+        </button>
+      )}
+      {showVideo && videoUrl && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-4xl bg-[var(--secondary)] rounded-2xl shadow-2xl overflow-hidden">
+            <button
+              type="button"
+              className="absolute top-4 right-4 bg-white/80 text-black rounded-full px-3 py-1 text-sm font-medium hover:bg-white"
+              onClick={() => setShowVideo(false)}
+            >
+              Cerrar
+            </button>
+            <div className="aspect-video w-full">
+              <iframe
+                className="w-full h-full"
+                src={videoUrl}
+                title="Video explicativo Aqua"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
