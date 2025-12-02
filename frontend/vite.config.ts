@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
     preview: {
     // host y port los estás pasando ya por CLI con:
     // npm run preview -- --host 0.0.0.0 --port $PORT
-    allowedHosts: ["aqua-production-a60e.up.railway.app"],
+    allowedHosts: ["aqua-production-86c4.up.railway.app"],
   },
   };
 });
